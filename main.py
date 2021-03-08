@@ -35,6 +35,25 @@ ACTIVATIONS = {
     'ReLU': nn.ReLU(),
     'Tanh': nn.Tanh()
 }
+class Level(object):
+    def __init__(self, levels, colors):
+        self.levels = levels
+        self.colors = colors
+        self.monsters = {}
+        self.monster_positions = []
+
+    def add_monster(self, name, file_name):
+        self.monsters[name] = plt.imread(file_name)
+
+    def add_monster_position(self, name, x, y, target_color):
+        self.monster_positions.append((name, x, y, target_color))
+
+def get_level():
+    level = Level([-100, 0, 100], ['blue', 'yellow'])
+    level.add_monster('blue', 'apoke.04_00067.png')
+    level.add_monster('yellow', 'apoke.16_00040.png')
+    level.add_monster_positions
+
 
 class ButtonAction(object):
     def do_action(self, *args):
@@ -144,6 +163,16 @@ class Graph(object):
 
         return text
 
+    def draw_point(self, ax, img, x, y, target_color, output_color):
+        match_color = 'green' if target_color == output_color else 'red'
+        target_circle = plt.Circle((x, y), 0.03*self.m_size, color=target_color, zorder=2)
+        output_circle = plt.Circle((x, y), 0.04*self.m_size, color=output_color, zorder=2)
+        correct_circle = plt.Circle((x, y), 0.05*self.m_size, color=match_color, zorder=2)
+        ax.add_patch(correct_circle)
+        ax.add_patch(output_circle)
+        ax.add_patch(target_circle)
+        ax.imshow(img, extent=[x-0.05*self.m_size, x+0.05*self.m_size, y-0.05*self.m_size, y+0.05*self.m_size], zorder=2)
+
     def render(self, a):
         self.m_size += 1
         data = self.get_model_data()
@@ -194,7 +223,7 @@ class Graph(object):
                 assert(len(levels)-1==cmap.N)
                 # the norm that we use to map values to colors, see the docs    
                 norm = colors.BoundaryNorm(levels, cmap.N)
-                ax.contourf(X, Y, Z, cmap=cmap, levels=levels, norm=norm, alpha=0.5)
+                ax.contourf(X, Y, Z, cmap=cmap, levels=levels, norm=norm)
             else:
                 cs = ax.contourf(X, Y, Z, cmap='winter')
         if self.options.is_wireframe:
@@ -206,15 +235,13 @@ class Graph(object):
                     ax.scatter(x[i], y[i], z[i], s=50, marker=markers[i], c=colors[i])
                 else:
                     #ax.scatter(x[i], y[i], marker=markers[i], c=colors[i])
+                    img = MARK_TO_IMG[markers[i]]
                     point_target = data_target[i]
                     point_output = 1 if output[i] >= 0.0 else -1
-                    point_color = 'blue' if point_output == 1 else 'yellow'
-                    match_color = 'green' if point_target == point_output else 'red'
-                    circle = plt.Circle((x[i], y[i]), 0.05*self.m_size, color=point_color, alpha=0.5)
-                    ac_circle = plt.Circle((x[i], y[i]), 0.05*self.m_size, color=match_color, lw=5, fill=False)
-                    ax.add_patch(ac_circle)
-                    ax.add_patch(circle)
-                    ax.imshow(MARK_TO_IMG[markers[i]], extent=[x[i]-0.05*self.m_size, x[i]+0.05*self.m_size, y[i]-0.05*self.m_size, y[i]+0.05*self.m_size], zorder=2)
+                    target_color = 'yellow' if point_target == 1 else 'blue'
+                    output_color = 'yellow' if point_output == 1 else 'blue'
+                    self.draw_point(ax, img, x[i], y[i], target_color, output_color)
+
             if self.options.is_3d:
                 if self.options.is_x_projection_point:
                     ax.scatter(min_x, y[i], z[i], marker=markers[i], c=colors[i])
