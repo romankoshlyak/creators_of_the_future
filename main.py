@@ -110,6 +110,39 @@ class GraphOptions(object):
         open_accordion_buttion = self.create_toggle_button(application, False, 'Options', OpenAccordionAction(accordion).do_action, False)
         return widgets.VBox(children=[open_accordion_buttion, accordion])
 
+class StatusObject(object):
+    def __init__(self, file_name, x_offset, text_format, value, min_value = 0.0, max_value = 1.0):
+        self.img = plt.imread(file_name)
+        self.x_offset = x_offset
+        self.text_format = text_format
+        self.value = value
+        self.min_value = min_value
+        self.max_value = max_value
+
+class BarGraph(object):
+    def __init__(self, statuses):
+        self.statuses = statuses
+        self.graph_update = widgets.IntSlider(max=100000)
+        self.graph = widgets.interactive_output(self.render, {'a' : self.graph_update})
+
+    def rerender(self):
+        self.graph_update.value = self.graph_update.value + 1
+
+    def render(self, a):
+        fig = plt.figure(figsize=(8, 1), frameon=False)
+        ax = fig.add_axes([0, 0, 1, 1])
+        ax.set_xlim([0, 8])
+        ax.set_ylim([0, 1])
+        plt.axis('off')
+        for status in self.statuses:
+            ax.imshow(status.img, extent=[status.x_offset, status.x_offset+1, 0, 1], zorder=1)
+            y_offset = (status.value-status.min_value)/(status.max_value-status.min_value)
+            rect = plt.Rectangle((status.x_offset, y_offset), 1, (1.0-y_offset), color='white', alpha=0.8, zorder=2)
+            ax.add_patch(rect)
+            ax.text(status.x_offset+1, 0.5, status.text_format.format(status.value, status.max_value))
+
+        plt.show()
+
 class Graph(object):
     def __init__(self, model, application, dim_count):
         self.m_size = 1
@@ -148,21 +181,6 @@ class Graph(object):
             output = self.model(data)
         return output.view(-1).numpy()
 
-    def get_coord_text(self, i):
-        first_dim = self.first_dim
-        second_dim = self.second_dim
-        text = ''
-        for ind in range(self.dim_count+1):
-            c = self.application.data[i,ind]
-            c_str = " {:.1f}".format(c)
-            if ind == first_dim or ind == second_dim:
-                c_str = '['+c_str+']'
-            if ind == self.dim_count:
-                text += '->'
-            text += c_str
-
-        return text
-
     def draw_point(self, ax, img, x, y, target_color, output_color):
         match_color = 'green' if target_color == output_color else 'red'
         target_circle = plt.Circle((x, y), 0.03*self.m_size, color=target_color, zorder=2)
@@ -189,74 +207,29 @@ class Graph(object):
         Z = self.model_prediction(X, Y)        
         min_z = math.floor(np.min(Z))
         max_z = math.ceil(np.max(Z))
-        fig = plt.figure(figsize=(12, 10))
-        projection = '3d' if self.options.is_3d else None
-        ax = fig.add_subplot(projection=projection)
+        fig = plt.figure(figsize=(8, 8), frameon=False)
+        ax = fig.add_axes([0, 0, 1, 1])
+        plt.axis('off')
+        #plt.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
+        #ax.margins(0.0)
         ax.set_xlim([min_x, max_x])
         ax.set_ylim([min_y, max_y])
-        if self.options.is_3d:
-            ax.set_zlim([min_z, max_z])
-        first_dim_name = self.application.dim_names[self.first_dim]
-        second_dim_name = self.application.dim_names[self.second_dim]
-        output_name = self.application.dim_names[self.dim_count]
-        title = "W0*{}+W1*{}+B".format(first_dim_name, second_dim_name)
-        if self.model.activation != LINEAR:
-            title = "{}({})".format(self.model.activation, title)
-        if self.options.is_axis_off:
-            plt.axis('off')
-        else:
-            ax.set_title("{} -> {}".format(title, output_name))
-            ax.set_xlabel(first_dim_name)
-            ax.set_ylabel(second_dim_name)
-        if self.options.is_3d:
-            ax.set_zlabel(output_name)
-        if self.options.is_surface_projection:
-            z_offset=(max_z-min_z)*0.02
-            #cs = ax.contourf(X, Y, Z, offset=min_z-z_offset, cmap='winter', alpha=0.8)
-        if self.options.is_surface:
-            if self.options.is_3d:
-                ax.plot_surface(X, Y, Z, cmap='winter', alpha=0.1)
-            elif self.options.is_2_colors:
-                levels = [-100, 0, 100]
-                cmap = colors.ListedColormap(['blue', 'yellow'])
-                # the nuber of intervals must be equal to the number of listed colors
-                assert(len(levels)-1==cmap.N)
-                # the norm that we use to map values to colors, see the docs    
-                norm = colors.BoundaryNorm(levels, cmap.N)
-                ax.contourf(X, Y, Z, cmap=cmap, levels=levels, norm=norm)
-            else:
-                cs = ax.contourf(X, Y, Z, cmap='winter')
-        if self.options.is_wireframe:
-            ax.plot_wireframe(X, Y, Z, color='black', rcount=5, ccount=5)
-        #cbar = fig.colorbar(cs)
+
+        levels = [-100, 0, 100]
+        cmap = colors.ListedColormap(['blue', 'yellow'])
+        # the nuber of intervals must be equal to the number of listed colors
+        assert(len(levels)-1==cmap.N)
+        # the norm that we use to map values to colors, see the docs
+        norm = colors.BoundaryNorm(levels, cmap.N)
+        ax.contourf(X, Y, Z, cmap=cmap, levels=levels, norm=norm)
         for i in range(len(data)):
-            if self.options.is_point:
-                if self.options.is_3d:
-                    ax.scatter(x[i], y[i], z[i], s=50, marker=markers[i], c=colors[i])
-                else:
-                    #ax.scatter(x[i], y[i], marker=markers[i], c=colors[i])
-                    img = MARK_TO_IMG[markers[i]]
-                    point_target = data_target[i]
-                    point_output = 1 if output[i] >= 0.0 else -1
-                    target_color = 'yellow' if point_target == 1 else 'blue'
-                    output_color = 'yellow' if point_output == 1 else 'blue'
-                    self.draw_point(ax, img, x[i], y[i], target_color, output_color)
+            img = MARK_TO_IMG[markers[i]]
+            point_target = data_target[i]
+            point_output = 1 if output[i] >= 0.0 else -1
+            target_color = 'yellow' if point_target == 1 else 'blue'
+            output_color = 'yellow' if point_output == 1 else 'blue'
+            self.draw_point(ax, img, x[i], y[i], target_color, output_color)
 
-            if self.options.is_3d:
-                if self.options.is_x_projection_point:
-                    ax.scatter(min_x, y[i], z[i], marker=markers[i], c=colors[i])
-                if self.options.is_x_projection_line:
-                    ax.plot((min_x,x[i]), (y[i], y[i]), (z[i], z[i]), linestyle=(0, (5, 10)), c='grey')
-                if self.options.is_y_projection_point:
-                    ax.scatter(x[i], max_y, z[i], marker=markers[i], c=colors[i])
-                if self.options.is_y_projection_line:
-                    ax.plot((x[i],x[i]), (y[i], max_y), (z[i], z[i]), linestyle=(0, (5, 10)), c='grey')
-                if self.options.is_z_projection_point:
-                    ax.scatter(x[i], y[i], min_z-z_offset, marker=markers[i], c=colors[i])
-                if self.options.is_z_projection_line:
-                    ax.plot((x[i],x[i]), (y[i], y[i]), (min_z-z_offset, z[i]), linestyle=(0, (5, 10)), c='grey')
-
-        #    ax.annotate(self.get_coord_text(i), xy=(x, y), ha="center", xytext=(0, 12), textcoords='offset points')
         plt.show()
 
 def play_audio(file_name):
@@ -408,7 +381,10 @@ class Application(object):
 
     def render(self):
         boxes = []
-        boxes.append(widgets.Label('Task: Split red and yellow objects. After last step, yellow objects should have value 1.0 and red objects should have value 0.0'))
+        s1 = StatusObject(DARK_F, 2.0, "Acurasimus\n {0:.2f}/{1}", 0.2503)
+        s2 = StatusObject(LIGHT_F, 5.0, "Iterasimus\n {0}/{1}", 6, 0, 10)
+        bar_graph = BarGraph([s1, s2])
+        boxes.append(bar_graph.graph)
         for graph in self.graphs:
             graph_widget = Box(children=[graph.graph], layout=Layout(width='70%'))
             controls = VBox(children=self.get_controls(graph), layout=Layout(width='30%'))
