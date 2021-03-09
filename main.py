@@ -210,8 +210,6 @@ class Graph(object):
         fig = plt.figure(figsize=(8, 8), frameon=False)
         ax = fig.add_axes([0, 0, 1, 1])
         plt.axis('off')
-        #plt.subplots_adjust(left=0, bottom=0, right=1, top=1, wspace=0, hspace=0)
-        #ax.margins(0.0)
         ax.set_xlim([min_x, max_x])
         ax.set_ylim([min_y, max_y])
 
@@ -222,13 +220,18 @@ class Graph(object):
         # the norm that we use to map values to colors, see the docs
         norm = colors.BoundaryNorm(levels, cmap.N)
         ax.contourf(X, Y, Z, cmap=cmap, levels=levels, norm=norm)
+        good = 0
+        total = 0
         for i in range(len(data)):
             img = MARK_TO_IMG[markers[i]]
             point_target = data_target[i]
             point_output = 1 if output[i] >= 0.0 else -1
             target_color = 'yellow' if point_target == 1 else 'blue'
             output_color = 'yellow' if point_output == 1 else 'blue'
+            good += 1 if target_color == output_color else 0
+            total += 1
             self.draw_point(ax, img, x[i], y[i], target_color, output_color)
+        self.application.update_status(good/total)
 
         plt.show()
 
@@ -310,12 +313,20 @@ class WidgetsManager(object):
 
 class Application(object):
     def __init__(self):
+        self.accuracy = StatusObject(DARK_F, 2.0, "Acurasimus\n {0:.2f}/{1}", 0.0)
+        self.iteration = StatusObject(LIGHT_F, 5.0, "Iterasimus\n {0}/{1}", 0, 0, 10)
+        self.bar_graph = BarGraph([self.accuracy, self.iteration])
         self.widgets_manager = WidgetsManager()
         self.neurons_count = 3
         self.dim_names = ["X", "Y"] + ["N{}".format((ind+1)) for ind in range(self.neurons_count)]
         self.graphs = []
         self.graphs.append(Graph(LinearModel(0.5, 0.5, 0.0), self, len(self.graphs)+2))
         self.create_data()
+
+    def update_status(self, accuracy):
+        self.accuracy.value = accuracy
+        self.iteration.value += 1
+        self.bar_graph.rerender()
 
     def get_dim_selector(self, graph):
         first_dim_selector = widgets.Dropdown(
@@ -381,10 +392,7 @@ class Application(object):
 
     def render(self):
         boxes = []
-        s1 = StatusObject(DARK_F, 2.0, "Acurasimus\n {0:.2f}/{1}", 0.2503)
-        s2 = StatusObject(LIGHT_F, 5.0, "Iterasimus\n {0}/{1}", 6, 0, 10)
-        bar_graph = BarGraph([s1, s2])
-        boxes.append(bar_graph.graph)
+        boxes.append(self.bar_graph.graph)
         for graph in self.graphs:
             graph_widget = Box(children=[graph.graph], layout=Layout(width='70%'))
             controls = VBox(children=self.get_controls(graph), layout=Layout(width='30%'))
