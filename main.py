@@ -142,9 +142,6 @@ class Level(object):
         self.disabled_buttons = disabled_buttons
 
 class Application(object):
-    def __init__(self):
-        pass
-
     def render(self):
         view = MainView()
         return view.render()

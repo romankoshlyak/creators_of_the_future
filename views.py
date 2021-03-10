@@ -2,15 +2,19 @@ import copy
 import numpy as np
 from ipywidgets import Layout, Button, VBox, HBox, Label, Box, GridBox
 from utils import WidgetsManager
-from levels import StudyLineLevel
+from levels import InfoLevel, StudyLineLevel
 from models import StudyLineModel
 from graphs import StudyLineGraph
 from levels import LevelType
 from actions import ChangeWeightAction, NextLevelAction, RestartLevelAction
 
 class LevelView(object):
-    def __init__(self):
+    def __init__(self, main_view):
         self.widgets_manager = WidgetsManager()
+        self.main_view = main_view
+
+    def do_next_level(self):
+        self.main_view.do_next_level()
 
     def index_grid_items(self, items):
         for index in range(len(items)):
@@ -22,6 +26,28 @@ class LevelView(object):
         button.on_click(action.do_action)
         self.widgets_manager.add_widget(button)
         return button
+
+    def get_level_controls(self, show_restart_button = True, disable_next_button = True):
+        items = []
+        if show_restart_button:
+            items.append(self.create_button('Restart level', RestartLevelAction(self)))
+        else:
+            items.append(Label(""))
+        self.next_level_button = self.create_button('Next level', NextLevelAction(self))
+        if disable_next_button:
+            self.next_level_button.disabled = True
+        items.append(self.next_level_button)
+
+        items = self.index_grid_items(items)
+        return GridBox(
+            children=items,
+            layout=Layout(
+                grid_template_rows='repeat(2, max-content)',
+                grid_template_columns='50% 50%',
+                grid_template_areas='''
+                "item0 item1"
+                ''')
+       )
 
 class MonsterLevelView(LevelView):
     PARAM_NAMES = ['Witos Seros', 'Witos Unos', 'Bias']
@@ -83,17 +109,13 @@ class MonsterLevelView(LevelView):
 class StudyLineLevelView(LevelView):
     PARAM_NAMES = ['Witos Seros', 'Witos Unos', 'Bias']
     def __init__(self, level, main_view):
-        super(StudyLineLevelView, self).__init__()
+        super(StudyLineLevelView, self).__init__(main_view)
         self.xgrid = (-3.0, 3.0)
         self.ygrid = (-3.0, 3.0)
         self.level = level
-        self.main_view = main_view
         self.widgets_manager = WidgetsManager()
         self.finished = False
         self.graph = StudyLineGraph(self)
-
-    def do_next_level(self):
-        self.main_view.do_next_level()
 
     def get_controls_items(self):
         model = self.level.model
@@ -130,25 +152,6 @@ class StudyLineLevelView(LevelView):
                 "item1 item2 item3"
                 "item4 item5 item6"
                 "item7 item8 item9"
-                ''')
-       )
-
-    def get_game_controls(self):
-        items = [Label('Level controls')]
-        items.append(self.create_button('Restart level', RestartLevelAction(self)))
-        self.next_level_button = self.create_button('Next level', NextLevelAction(self))
-        self.next_level_button.disabled = True
-        items.append(self.next_level_button)
-                
-        items = self.index_grid_items(items)
-        return GridBox(
-            children=items,
-            layout=Layout(
-                grid_template_rows='repeat(2, max-content)',
-                grid_template_columns='auto auto',
-                grid_template_areas='''
-                "item0 item0"
-                "item1 item2"
                 ''')
        )
 
@@ -284,26 +287,45 @@ class StudyLineLevelView(LevelView):
         header = self.get_game_status()
         graph = self.graph.graph
         self.controls = self.get_controls()
-        game_controls = self.get_game_controls()
-        header.layout.grid_area = 'header'
-        graph.layout.grid_area = 'graph'
-        self.controls.layout.grid_area = 'controls'
         return GridBox(
-            children=self.index_grid_items([header, graph, self.controls, game_controls]),
+            children=self.index_grid_items([header, self.get_level_controls(), graph, self.controls]),
             layout=Layout(
                 grid_template_rows='repeat(2, max-content)',
                 grid_template_columns='70% 30%',
                 grid_template_areas='''
-                "item0 item0"
-                "item1 item2"
-                "item1 item3"
+                "item0 item1"
+                "item2 item3"
                 ''')
        )
+
+class InfoLevelView(LevelView):
+    def __init__(self, level, main_view):
+        super(InfoLevelView, self).__init__(main_view)
+        self.level = level
+
+
+    def render(self):
+        header = Label(self.level.text)
+        info = Label(self.level.text)
+        return GridBox(
+            children=self.index_grid_items([header, self.get_level_controls(False, False), info]),
+            layout=Layout(
+                grid_template_rows='repeat(2, max-content)',
+                grid_template_columns='70% 30%',
+                grid_template_areas='''
+                "item0 item1"
+                "item2 ."
+                "item2 ."
+                ''')
+       )
+        return Label(self.level.text)
 
 class MainView(object):
     def __init__(self):
         self.levels = [
+            InfoLevel("How are you?"),
             StudyLineLevel(StudyLineModel(0.0, -1.0, 0.0), StudyLineModel(0.0, -1.0, -0.5), [True, True, True, True, True, False]),
+            InfoLevel("How are you?"),
             StudyLineLevel(StudyLineModel(1.0, 0.1, 0.0), StudyLineModel(1.0, 0.1, 0.5), [True, True, True, True, False, True]),
             StudyLineLevel(StudyLineModel(1.0, 0.9, 0.0), StudyLineModel(1.0, 0.4, 0.0), [True, True, True, False, True, True]),
             StudyLineLevel(StudyLineModel(1.0, -2.0, 0.0), StudyLineModel(1.0, -1.5, 0.0), [True, True, False, True, True, True]),
@@ -320,6 +342,8 @@ class MainView(object):
     def get_view_for_level(self, level):
         if level.level_type == LevelType.STUDY_LINE:
             return StudyLineLevelView(level, self)
+        elif level.level_type == LevelType.INFO:
+            return InfoLevelView(level, self)
 
     def do_next_level(self):
         self.load_current_level(self.current_level_index+1)

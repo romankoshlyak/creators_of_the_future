@@ -1,8 +1,8 @@
 from enum import Enum
 class LevelType(Enum):
     STUDY_LINE = 1
-    GREEN = 2
-    BLUE = 3
+    INFO = 2
+    SPLIT_MONSTERS = 3
 
 class Level(object):
     def __init__(self, level_type):
@@ -14,3 +14,8 @@ class StudyLineLevel(Level):
         self.model = model
         self.target_model = target_model
         self.disabled_buttons = disabled_buttons
+
+class InfoLevel(Level):
+    def __init__(self, text):
+        super(InfoLevel, self).__init__(LevelType.INFO)
+        self.text = text
