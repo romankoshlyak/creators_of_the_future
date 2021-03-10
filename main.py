@@ -5,7 +5,7 @@ from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
 from matplotlib import colors
 import numpy as np
-from ipywidgets import Layout, Button, VBox, HBox, Label, Box
+from ipywidgets import Layout, Button, VBox, HBox, Label, Box, GridBox
 import ipywidgets as widgets
 import torch
 from google.colab import output
@@ -22,7 +22,6 @@ MARK_TO_F = {
     'light': LIGHT_F
 }
 MARK_TO_IMG = { k : plt.imread(MARK_TO_F[k]) for k in MARK_TO_F}
-PARAM_NAMES = ['Witos Seros', 'Witos Unos', 'Bias']
 DATA = np.array([[-2.0, -2.0], [-2.0, 2.0], [2.0, -2.0], [2.0, 2.0]])
 data_target = [1, 1, -1, -1]
 data_colors = ['red', 'blue', 'blue', 'red']
@@ -144,15 +143,11 @@ class BarGraph(object):
         plt.show()
 
 class Graph(object):
-    def __init__(self, model, application, dim_count):
+    def __init__(self, model, application,):
         self.m_size = 1
         self.model = model
         self.application = application
-        self.dim_count = dim_count
-        self.first_dim = self.dim_count-2
-        self.second_dim = self.dim_count-1
         self.graph_update = widgets.IntSlider(max=100000)
-        self.application.create_data(self)
         self.options = GraphOptions()
         self.graph = widgets.interactive_output(self.render, {'a' : self.graph_update})
 
@@ -172,7 +167,7 @@ class Graph(object):
             return output.view_as(XT).numpy()
 
     def get_model_data(self):
-        return self.application.data[:, [self.first_dim, self.second_dim]]
+        return DATA.copy()
 
     def get_model_output(self):
         data = self.get_model_data()
@@ -247,17 +242,17 @@ def button_name_to_audio_file(button_name):
 
 
 class ChangeWeightAction(ButtonAction):
-    def __init__(self, spell_audio_file, mult, tensor, index, application):
+    def __init__(self, spell_audio_file, mult, tensor, index, view):
         self.mult = mult
         self.tensor = tensor
         self.index = index
         self.spell_audio_file = spell_audio_file
-        self.application = application
+        self.view = view
 
     def do_action(self, *args):
         self.tensor.view(-1)[self.index] += self.mult * 0.1
         play_audio(self.spell_audio_file)
-        self.application.rerender()
+        self.view.update_model()
 
 class ChooseDimensionAction(ButtonAction):
     def __init__(self, application, graph, dim_number, dim_selector):
@@ -311,39 +306,14 @@ class WidgetsManager(object):
         for widget, disabled in zip(self.all_widgets, self.saved_disabled):
             widget.disabled = disabled
 
-class Application(object):
+class LevelView(object):
     def __init__(self):
-        self.accuracy = StatusObject(DARK_F, 2.0, "Acurasimus\n {0:.2f}/{1}", 0.0)
-        self.iteration = StatusObject(LIGHT_F, 5.0, "Iterasimus\n {0}/{1}", 0, 0, 10)
-        self.bar_graph = BarGraph([self.accuracy, self.iteration])
         self.widgets_manager = WidgetsManager()
-        self.neurons_count = 3
-        self.dim_names = ["X", "Y"] + ["N{}".format((ind+1)) for ind in range(self.neurons_count)]
-        self.graphs = []
-        self.graphs.append(Graph(LinearModel(0.5, 0.5, 0.0), self, len(self.graphs)+2))
-        self.create_data()
 
-    def update_status(self, accuracy):
-        self.accuracy.value = accuracy
-        self.iteration.value += 1
-        self.bar_graph.rerender()
-
-    def get_dim_selector(self, graph):
-        first_dim_selector = widgets.Dropdown(
-            options=self.dim_names[:graph.dim_count],
-            description='First dim:',
-            index=graph.first_dim
-        )
-        first_dim_selector.observe(ChooseDimensionAction(self, graph, 0, first_dim_selector).do_action, names='value')
-        self.widgets_manager.add_widget(first_dim_selector)
-        second_dim_selector = widgets.Dropdown(
-            options=self.dim_names[:graph.dim_count],
-            description='Second dim:',
-            index=graph.second_dim
-        )
-        second_dim_selector.observe(ChooseDimensionAction(self, graph, 1, second_dim_selector).do_action, names='value')
-        self.widgets_manager.add_widget(second_dim_selector)
-        return VBox(children=[first_dim_selector, second_dim_selector], layout=Layout(width='100%'))
+    def index_grid_items(self, items):
+        for index in range(len(items)):
+            items[index].layout.grid_area = "item{}".format(index)
+        return items
 
     def create_button(self, name, on_click):
         button = widgets.Button(description=name)
@@ -351,6 +321,25 @@ class Application(object):
         self.widgets_manager.add_widget(button)
         return button
 
+class MonsterLevelView(LevelView):
+    PARAM_NAMES = ['Witos Seros', 'Witos Unos', 'Bias']
+    def __init__(self, level):
+        super(MonsterLevelView, self).__init__()
+        self.level = level
+        self.accuracy = StatusObject(DARK_F, 2.0, "Acurasimus\n {0:.2f}/{1}", 0.0)
+        self.iteration = StatusObject(LIGHT_F, 5.0, "Iterasimus\n {0}/{1}", 0, 0, 10)
+        self.bar_graph = BarGraph([self.accuracy, self.iteration])
+        self.main_graph = Graph(LinearModel(0.5, 0.5, 0.0), self)
+
+    def update_status(self, accuracy):
+        self.accuracy.value = accuracy
+        self.iteration.value += 1
+        self.bar_graph.rerender()
+
+    def update_model(self):
+        self.widgets_manager.disable_widgets()
+        self.main_graph.rerender()
+        self.widgets_manager.enable_widgets()
         
     def get_controls(self, graph):
         model = graph.model
@@ -361,7 +350,7 @@ class Application(object):
         for param in model.named_parameters():
             tensor = param[1].data
             for i in range(len(tensor.view(-1))):
-                param_name = PARAM_NAMES[param_index]
+                param_name = self.PARAM_NAMES[param_index]
                 param_index += 1
                 button_name_add = f'{param_name} Adinimus'
                 button_name_sub = f'{param_name} Subinimus'
@@ -371,35 +360,32 @@ class Application(object):
                 buttons.append(self.create_button(button_name_sub, ChangeWeightAction(sub_spell, -1.0, tensor, i, self).do_action))
                 
         all_parameter_controls.append(widgets.GridBox(children=buttons, layout=Layout(grid_template_columns='auto auto')))
-
-        return all_parameter_controls
-
-    def create_data(self, current_graph=None):
-        data = DATA
-        graphs = self.graphs.copy()
-        if current_graph is not None:
-            graphs.append(current_graph)
-        self.data = np.append(data, np.zeros([data.shape[0], len(graphs)]), 1)
-        for ind, graph in enumerate(self.graphs):
-            self.data[:, ind+2] = graph.get_model_output()
-
-    def rerender(self):
-        self.widgets_manager.disable_widgets()
-        for ind, graph in enumerate(self.graphs):
-            self.data[:, ind+2] = graph.get_model_output()
-            graph.rerender()
-        self.widgets_manager.enable_widgets()
+        return VBox(children=all_parameter_controls)
 
     def render(self):
-        boxes = []
-        boxes.append(self.bar_graph.graph)
-        for graph in self.graphs:
-            graph_widget = Box(children=[graph.graph], layout=Layout(width='70%'))
-            controls = VBox(children=self.get_controls(graph), layout=Layout(width='30%'))
-            box_layout = Layout(width='100%', height='100%')
-            box = Box(children=[graph_widget, controls], layout=box_layout)
-            boxes.append(box)
-        return VBox(children=boxes)
+        bar = self.bar_graph.graph
+        main = self.main_graph.graph
+        controls = self.get_controls(self.main_graph)
+        return GridBox(
+            children=self.index_grid_items([bar, main, controls]),
+            layout=Layout(
+                grid_template_rows='repeat(2, max-content)',
+                grid_template_columns='70% 30%',
+                grid_template_areas='''
+                "item0 item0"
+                "item1 item2"
+                "item1 ."
+                ''')
+       )
+
+class Application(object):
+    def __init__(self):
+        pass
+
+    def render(self):
+        level = None
+        view = MonsterLevelView(level)
+        return view.render()
 
 app = Application()
 app.render()
