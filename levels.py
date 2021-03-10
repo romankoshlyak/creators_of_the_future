@@ -32,6 +32,7 @@ class SplitMonstersLevel(Level):
         self.levels = levels
         self.colors = colors
         self.monsters = monsters
+        self.max_iterations = 3
 
 class MonsterInfo(object):
     def __init__(self, x, y, image_file, target_level):

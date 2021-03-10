@@ -28,6 +28,18 @@ class LevelView(object):
         self.widgets_manager.add_widget(button)
         return button
 
+    def get_main_view(self, items):
+        return GridBox(
+            children=self.index_grid_items(items),
+            layout=Layout(
+                grid_template_rows='repeat(2, max-content)',
+                grid_template_columns='70% 30%',
+                grid_template_areas='''
+                "item0 item1"
+                "item2 item3"
+                ''')
+        )
+
     def get_level_controls(self, show_restart_button = True, disable_next_button = True):
         items = []
         if show_restart_button:
@@ -65,13 +77,15 @@ class MonsterLevelView(LevelView):
         super(MonsterLevelView, self).__init__(main_view)
         self.level = level
         self.accuracy = StatusObject(Images.ACCURACY, 2.0, "Acurasimus\n {0:.2f}/{1}", 0.0)
-        self.iteration = StatusObject(Images.ITERATION, 5.0, "Iterasimus\n {0}/{1}", 0, 0, 10)
+        self.iteration = StatusObject(Images.ITERATION, 5.0, "Iterasimus\n {0}/{1}", 0, 0, self.level.max_iterations)
         self.bar_graph = BarGraph([self.accuracy, self.iteration])
         self.main_graph = MonsterGraph(LinearModel(0.5, 0.5, 0.0), self)
 
     def update_status(self, accuracy):
         self.accuracy.value = accuracy
         self.iteration.value += 1
+        if self.iteration.value == self.level.max_iterations:
+            self.main_view.do_next_level()
         self.bar_graph.rerender()
 
     def update_model(self):
@@ -105,20 +119,7 @@ class MonsterLevelView(LevelView):
         return VBox(children=all_parameter_controls)
 
     def render(self):
-        bar = self.bar_graph.graph
-        main = self.main_graph.graph
-        controls = self.get_controls(self.main_graph)
-        return GridBox(
-            children=self.index_grid_items([bar, main, controls]),
-            layout=Layout(
-                grid_template_rows='repeat(2, max-content)',
-                grid_template_columns='70% 30%',
-                grid_template_areas='''
-                "item0 item0"
-                "item1 item2"
-                "item1 ."
-                ''')
-       )
+        return self.get_main_view([self.bar_graph.graph, self.get_level_controls(False), self.main_graph.graph, self.get_controls(self.main_graph)])
 
 class StudyLineLevelView(LevelView):
     PARAM_NAMES = ['Weight 0', 'Weight 1', 'Bias']
@@ -196,8 +197,6 @@ class StudyLineLevelView(LevelView):
                 "item2 item2"
                 ''')
        )
-
-        return self.game_status_box
 
     def update_model(self):
         if self.is_same_line(self.level.model, self.level.target_model):
@@ -344,22 +343,25 @@ class InfoLevelView(LevelView):
 
 class MainView(object):
     def __init__(self):
-        self.levels = list(SplitMonstersLevelsFactory().get_levels()) + [
-            InfoLevel("Bed time", "./images/sleep.png", "After a long day, it's time to go to sleep", "Click next level, to continue..."),
-            StudyLineLevel(StudyLineModel(0.0, -1.0, 0.0), StudyLineModel(0.0, -1.0, -0.5), [True, True, True, True, True, False]),
-            InfoLevel("Header", "./images/sleep.png", "Story1", "Story2"),
-            StudyLineLevel(StudyLineModel(1.0, 0.1, 0.0), StudyLineModel(1.0, 0.1, 0.5), [True, True, True, True, False, True]),
-            StudyLineLevel(StudyLineModel(1.0, 0.9, 0.0), StudyLineModel(1.0, 0.4, 0.0), [True, True, True, False, True, True]),
-            StudyLineLevel(StudyLineModel(1.0, -2.0, 0.0), StudyLineModel(1.0, -1.5, 0.0), [True, True, False, True, True, True]),
-            StudyLineLevel(StudyLineModel(-1.0, -2.0, 0.0), StudyLineModel(-1.5, -2.0, 0.0), [True, False, True, True, True, True]),
-            StudyLineLevel(StudyLineModel(1.0, -2.0, 0.0), StudyLineModel(1.5, -2.0, 0.0), [False, True, True, True, True, True]),
-            StudyLineLevel(StudyLineModel(0.5, 0.5, 0.0), StudyLineModel(0.7, 0.3, 0.0), [False, False, False, False, True, True]),
-            StudyLineLevel(StudyLineModel(0.5, 0.5, 0.0), StudyLineModel(0.7, 0.3, 0.5), []),
-            StudyLineLevel(StudyLineModel(-0.5, -0.5, 0.0), StudyLineModel(0.7, 0.3, -0.3), []),
-            StudyLineLevel(StudyLineModel(1.0, 0.3, 0.0), StudyLineModel(-1.0, 0.3, -0.7), []),
-        ]
+        self.levels = list(self.intro_info_levels()) + list(SplitMonstersLevelsFactory().get_levels()) + list(self.study_line_levels())
         self.main_box = VBox(children=[])
         self.load_current_level(0)
+
+    def intro_info_levels(self):
+        yield InfoLevel("Bed time", "./images/sleep.png", "After a long day, it's time to go to sleep", "Click next level, to continue...")
+
+    def study_line_levels(self):
+        yield StudyLineLevel(StudyLineModel(0.0, -1.0, 0.0), StudyLineModel(0.0, -1.0, -0.5), [True, True, True, True, True, False])
+        yield InfoLevel("Header", "./images/sleep.png", "Story1", "Story2")
+        yield StudyLineLevel(StudyLineModel(1.0, 0.1, 0.0), StudyLineModel(1.0, 0.1, 0.5), [True, True, True, True, False, True])
+        yield StudyLineLevel(StudyLineModel(1.0, 0.9, 0.0), StudyLineModel(1.0, 0.4, 0.0), [True, True, True, False, True, True])
+        yield StudyLineLevel(StudyLineModel(1.0, -2.0, 0.0), StudyLineModel(1.0, -1.5, 0.0), [True, True, False, True, True, True])
+        yield StudyLineLevel(StudyLineModel(-1.0, -2.0, 0.0), StudyLineModel(-1.5, -2.0, 0.0), [True, False, True, True, True, True])
+        yield StudyLineLevel(StudyLineModel(1.0, -2.0, 0.0), StudyLineModel(1.5, -2.0, 0.0), [False, True, True, True, True, True])
+        yield StudyLineLevel(StudyLineModel(0.5, 0.5, 0.0), StudyLineModel(0.7, 0.3, 0.0), [False, False, False, False, True, True])
+        yield StudyLineLevel(StudyLineModel(0.5, 0.5, 0.0), StudyLineModel(0.7, 0.3, 0.5), [])
+        yield StudyLineLevel(StudyLineModel(-0.5, -0.5, 0.0), StudyLineModel(0.7, 0.3, -0.3), [])
+        yield StudyLineLevel(StudyLineModel(1.0, 0.3, 0.0), StudyLineModel(-1.0, 0.3, -0.7), [])
 
     def get_view_for_level(self, level):
         if level.level_type == LevelType.STUDY_LINE:
