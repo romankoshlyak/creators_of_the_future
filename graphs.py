@@ -1,13 +1,40 @@
+import math
+import torch
+import numpy as np
 import ipywidgets as widgets
+from matplotlib import colors
 import matplotlib.pyplot as plt
 
+class BarGraph(object):
+    def __init__(self, statuses):
+        self.statuses = statuses
+        self.graph_update = widgets.IntSlider(max=100000)
+        self.graph = widgets.interactive_output(self.render, {'a' : self.graph_update})
+
+    def rerender(self):
+        self.graph_update.value = self.graph_update.value + 1
+
+    def render(self, a):
+        fig = plt.figure(figsize=(8, 1), frameon=False)
+        ax = fig.add_axes([0, 0, 1, 1])
+        ax.set_xlim([0, 8])
+        ax.set_ylim([0, 1])
+        plt.axis('off')
+        for status in self.statuses:
+            ax.imshow(status.img, extent=[status.x_offset, status.x_offset+1, 0, 1], zorder=1)
+            y_offset = (status.value-status.min_value)/(status.max_value-status.min_value)
+            rect = plt.Rectangle((status.x_offset, y_offset), 1, (1.0-y_offset), color='white', alpha=0.8, zorder=2)
+            ax.add_patch(rect)
+            ax.text(status.x_offset+1, 0.5, status.text_format.format(status.value, status.max_value))
+
+        plt.show()
+
 class MonsterGraph(object):
-    def __init__(self, model, application,):
+    def __init__(self, model, view):
         self.m_size = 1
         self.model = model
-        self.application = application
+        self.view = view
         self.graph_update = widgets.IntSlider(max=100000)
-        self.options = GraphOptions()
         self.graph = widgets.interactive_output(self.render, {'a' : self.graph_update})
 
     def rerender(self):
@@ -25,9 +52,6 @@ class MonsterGraph(object):
             output = self.model(data)
             return output.view_as(XT).numpy()
 
-    def get_model_data(self):
-        return DATA.copy()
-
     def get_model_output(self):
         data = self.get_model_data()
         data = torch.from_numpy(data).float()
@@ -35,21 +59,23 @@ class MonsterGraph(object):
             output = self.model(data)
         return output.view(-1).numpy()
 
-    def draw_point(self, ax, img, x, y, target_color, output_color):
-        match_color = 'green' if target_color == output_color else 'red'
-        target_circle = plt.Circle((x, y), 0.03*self.m_size, color=target_color, zorder=2)
-        output_circle = plt.Circle((x, y), 0.04*self.m_size, color=output_color, zorder=2)
+    def draw_point(self, ax, monster, output_level, colors):
+        x = monster.x
+        y = monster.y
+        target_level = monster.target_level
+        match_color = 'green' if monster.target_level == output_level else 'red'
+        target_circle = plt.Circle((x, y), 0.03*self.m_size, color=colors[target_level], zorder=2)
+        output_circle = plt.Circle((x, y), 0.04*self.m_size, color=colors[output_level], zorder=2)
         correct_circle = plt.Circle((x, y), 0.05*self.m_size, color=match_color, zorder=2)
         ax.add_patch(correct_circle)
         ax.add_patch(output_circle)
         ax.add_patch(target_circle)
-        ax.imshow(img, extent=[x-0.05*self.m_size, x+0.05*self.m_size, y-0.05*self.m_size, y+0.05*self.m_size], zorder=2)
+        ax.imshow(monster.image, extent=[x-0.05*self.m_size, x+0.05*self.m_size, y-0.05*self.m_size, y+0.05*self.m_size], zorder=2)
 
     def render(self, a):
         self.m_size += 1
-        data = self.get_model_data()
-        x = data[:, 0]
-        y = data[:, 1]
+        x = np.array([monster.x for monster in self.view.level.monsters])
+        y = np.array([monster.y for monster in self.view.level.monsters])
         output = self.model_prediction(x, y)
         min_x = math.floor(np.min(x)-1.0)
         max_x = math.ceil(np.max(x)+1.0)
@@ -67,8 +93,9 @@ class MonsterGraph(object):
         ax.set_xlim([min_x, max_x])
         ax.set_ylim([min_y, max_y])
 
-        levels = [-100, 0, 100]
-        cmap = colors.ListedColormap(['blue', 'yellow'])
+        level = self.view.level
+        levels = level.levels
+        cmap = colors.ListedColormap(level.colors)
         # the nuber of intervals must be equal to the number of listed colors
         assert(len(levels)-1==cmap.N)
         # the norm that we use to map values to colors, see the docs
@@ -76,16 +103,14 @@ class MonsterGraph(object):
         ax.contourf(X, Y, Z, cmap=cmap, levels=levels, norm=norm)
         good = 0
         total = 0
-        for i in range(len(data)):
-            img = MARK_TO_IMG[markers[i]]
-            point_target = data_target[i]
-            point_output = 1 if output[i] >= 0.0 else -1
-            target_color = 'yellow' if point_target == 1 else 'blue'
-            output_color = 'yellow' if point_output == 1 else 'blue'
-            good += 1 if target_color == output_color else 0
+        output_levels = norm(output)
+        for index, monster in enumerate(level.monsters):
+            target_level = monster.target_level
+            output_level = output_levels[index]
+            good += 1 if target_level == output_level else 0
             total += 1
-            self.draw_point(ax, img, x[i], y[i], target_color, output_color)
-        self.application.update_status(good/total)
+            self.draw_point(ax, monster, output_level, level.colors)
+        self.view.update_status(good/total)
 
         plt.show()
 

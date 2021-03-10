@@ -1,3 +1,5 @@
+from utils import Sounds
+
 class ButtonAction(object):
     def do_action(self, *args):
         pass
@@ -27,11 +29,12 @@ class ChangeWeightAction(ButtonAction):
     
     def set_audio_file(self, audio_file):
         self.audio_file = audio_file
+        return self
 
     def do_action(self, *args):
         self.tensor.view(-1)[self.index] += self.mult * 0.1
         if self.audio_file is not None:
-            play_audio(self.audio_file)
+            Sounds.play_audio(self.audio_file)
         self.view.update_model()
 
 class ChooseDimensionAction(ButtonAction):

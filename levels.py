@@ -1,4 +1,6 @@
 from enum import Enum
+from utils import Images
+
 class LevelType(Enum):
     STUDY_LINE = 1
     INFO = 2
@@ -22,3 +24,30 @@ class InfoLevel(Level):
         self.image_file = image_file
         self.story1 = story1
         self.story2 = story2
+
+
+class SplitMonstersLevel(Level):
+    def __init__(self, levels, colors, monsters):
+        super(SplitMonstersLevel, self).__init__(LevelType.SPLIT_MONSTERS)
+        self.levels = levels
+        self.colors = colors
+        self.monsters = monsters
+
+class MonsterInfo(object):
+    def __init__(self, x, y, image_file, target_level):
+        self.x = x
+        self.y = y
+        self.image = Images.load_image(image_file)
+        self.target_level = target_level
+
+class SplitMonstersLevelsFactory(object):
+    def get_levels(self):
+        levels = [-100, 0, 100]
+        colors = ['blue', 'yellow']
+        monsters = [
+            MonsterInfo(-2.0, -2.0, Images.BLUE_MONSTER, 0),
+            MonsterInfo(-2.0, 2.0, Images.BLUE_MONSTER, 0),
+            MonsterInfo(2.0, -2.0, Images.YELLOW_MONSTER, 1),
+            MonsterInfo(2.0, 2.0, Images.YELLOW_MONSTER, 1)
+        ]
+        yield SplitMonstersLevel(levels, colors, monsters) 

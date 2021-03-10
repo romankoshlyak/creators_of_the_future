@@ -8,27 +8,13 @@ class LinearModel(nn.Module):
         self.linear.weight.data[0, 0] = w1
         self.linear.weight.data[0, 1] = w2
         self.linear.bias.data[0] = b1
-        self.max_value = torch.tensor(-10.0)
-        self.activation = LINEAR
- 
-    def set_activation(self, activation):
-        self.activation = activation
-        return self
 
     def forward(self, x):
-        x = self.linear(x)
-        activation = ACTIVATIONS[self.activation]
-        if activation is not None:
-            x = activation(x)
-        return x
+        return self.linear(x)
 
-class StudyLineModel(nn.Module):
+class StudyLineModel(LinearModel):
     def __init__(self, w0, w1, b):
-        super(StudyLineModel, self).__init__()
-        self.linear = nn.Linear(2, 1)
-        self.linear.weight.data[0, 0] = w0
-        self.linear.weight.data[0, 1] = w1
-        self.linear.bias.data[0] = b
+        super(StudyLineModel, self).__init__(w0, w1, b)
 
     def get_w0(self):
         return self.linear.weight.data[0, 0]
@@ -38,7 +24,3 @@ class StudyLineModel(nn.Module):
 
     def get_b(self):
         return self.linear.bias.data[0]
-
-    def forward(self, x):
-        x = self.linear(x)
-        return x

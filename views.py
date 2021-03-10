@@ -1,10 +1,11 @@
 import copy
 import numpy as np
+import matplotlib.pyplot as plt
 from ipywidgets import Image, Layout, Button, VBox, HBox, Label, Box, GridBox
-from utils import WidgetsManager
-from levels import InfoLevel, StudyLineLevel
-from models import StudyLineModel
-from graphs import StudyLineGraph
+from utils import WidgetsManager, Images, Sounds
+from levels import InfoLevel, StudyLineLevel, SplitMonstersLevelsFactory
+from models import LinearModel, StudyLineModel
+from graphs import StudyLineGraph, BarGraph, MonsterGraph
 from levels import LevelType
 from actions import ChangeWeightAction, NextLevelAction, RestartLevelAction
 
@@ -49,15 +50,24 @@ class LevelView(object):
                 ''')
        )
 
+class StatusObject(object):
+    def __init__(self, file_name, x_offset, text_format, value, min_value = 0.0, max_value = 1.0):
+        self.img = plt.imread(file_name)
+        self.x_offset = x_offset
+        self.text_format = text_format
+        self.value = value
+        self.min_value = min_value
+        self.max_value = max_value
+
 class MonsterLevelView(LevelView):
     PARAM_NAMES = ['Witos Seros', 'Witos Unos', 'Bias']
-    def __init__(self, level):
-        super(MonsterLevelView, self).__init__()
+    def __init__(self, level, main_view):
+        super(MonsterLevelView, self).__init__(main_view)
         self.level = level
-        self.accuracy = StatusObject(DARK_F, 2.0, "Acurasimus\n {0:.2f}/{1}", 0.0)
-        self.iteration = StatusObject(LIGHT_F, 5.0, "Iterasimus\n {0}/{1}", 0, 0, 10)
+        self.accuracy = StatusObject(Images.ACCURACY, 2.0, "Acurasimus\n {0:.2f}/{1}", 0.0)
+        self.iteration = StatusObject(Images.ITERATION, 5.0, "Iterasimus\n {0}/{1}", 0, 0, 10)
         self.bar_graph = BarGraph([self.accuracy, self.iteration])
-        self.main_graph = Graph(LinearModel(0.5, 0.5, 0.0), self)
+        self.main_graph = MonsterGraph(LinearModel(0.5, 0.5, 0.0), self)
 
     def update_status(self, accuracy):
         self.accuracy.value = accuracy
@@ -68,6 +78,10 @@ class MonsterLevelView(LevelView):
         self.widgets_manager.disable_widgets()
         self.main_graph.rerender()
         self.widgets_manager.enable_widgets()
+
+    def button_name_to_audio_file(self, button_name):
+        sound_name = '_'.join(button_name.lower().split())
+        return Sounds.get_file(sound_name)
         
     def get_controls(self, graph):
         model = graph.model
@@ -82,12 +96,12 @@ class MonsterLevelView(LevelView):
                 param_index += 1
                 button_name_add = f'{param_name} Adinimus'
                 button_name_sub = f'{param_name} Subinimus'
-                add_spell = button_name_to_audio_file(button_name_add)
-                sub_spell = button_name_to_audio_file(button_name_sub)
-                buttons.append(self.create_button(button_name_add, ChangeWeightAction(add_spell, 1.0, tensor, i, self).do_action))
-                buttons.append(self.create_button(button_name_sub, ChangeWeightAction(sub_spell, -1.0, tensor, i, self).do_action))
+                add_spell = self.button_name_to_audio_file(button_name_add)
+                sub_spell = self.button_name_to_audio_file(button_name_sub)
+                buttons.append(self.create_button(button_name_add, ChangeWeightAction(1.0, tensor, i, self).set_audio_file(add_spell)))
+                buttons.append(self.create_button(button_name_sub, ChangeWeightAction(-1.0, tensor, i, self).set_audio_file(sub_spell)))
                 
-        all_parameter_controls.append(widgets.GridBox(children=buttons, layout=Layout(grid_template_columns='auto auto')))
+        all_parameter_controls.append(GridBox(children=buttons, layout=Layout(grid_template_columns='auto auto')))
         return VBox(children=all_parameter_controls)
 
     def render(self):
@@ -107,7 +121,7 @@ class MonsterLevelView(LevelView):
        )
 
 class StudyLineLevelView(LevelView):
-    PARAM_NAMES = ['Witos Seros', 'Witos Unos', 'Bias']
+    PARAM_NAMES = ['Weight 0', 'Weight 1', 'Bias']
     def __init__(self, level, main_view):
         super(StudyLineLevelView, self).__init__(main_view)
         self.xgrid = (-3.0, 3.0)
@@ -330,7 +344,7 @@ class InfoLevelView(LevelView):
 
 class MainView(object):
     def __init__(self):
-        self.levels = [
+        self.levels = list(SplitMonstersLevelsFactory().get_levels()) + [
             InfoLevel("Bed time", "./images/sleep.png", "After a long day, it's time to go to sleep", "Click next level, to continue..."),
             StudyLineLevel(StudyLineModel(0.0, -1.0, 0.0), StudyLineModel(0.0, -1.0, -0.5), [True, True, True, True, True, False]),
             InfoLevel("Header", "./images/sleep.png", "Story1", "Story2"),
@@ -352,6 +366,8 @@ class MainView(object):
             return StudyLineLevelView(level, self)
         elif level.level_type == LevelType.INFO:
             return InfoLevelView(level, self)
+        elif level.level_type == LevelType.SPLIT_MONSTERS:
+            return MonsterLevelView(level, self)
 
     def do_next_level(self):
         self.load_current_level(self.current_level_index+1)
