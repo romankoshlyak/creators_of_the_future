@@ -16,6 +16,9 @@ class StudyLineLevel(Level):
         self.disabled_buttons = disabled_buttons
 
 class InfoLevel(Level):
-    def __init__(self, text):
+    def __init__(self, header, image_file, story1, story2):
         super(InfoLevel, self).__init__(LevelType.INFO)
-        self.text = text
+        self.header = header
+        self.image_file = image_file
+        self.story1 = story1
+        self.story2 = story2

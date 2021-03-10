@@ -1,6 +1,6 @@
 import copy
 import numpy as np
-from ipywidgets import Layout, Button, VBox, HBox, Label, Box, GridBox
+from ipywidgets import Image, Layout, Button, VBox, HBox, Label, Box, GridBox
 from utils import WidgetsManager
 from levels import InfoLevel, StudyLineLevel
 from models import StudyLineModel
@@ -303,19 +303,27 @@ class InfoLevelView(LevelView):
         super(InfoLevelView, self).__init__(main_view)
         self.level = level
 
-
     def render(self):
-        header = Label(self.level.text)
-        info = Label(self.level.text)
+        header = Label(self.level.header)
+        image_file = open(self.level.image_file, "rb")
+        image = image_file.read()
+        image = Image(
+            value=image,
+            format='png',
+            width=512,
+            height=512,
+        )
+        story1 = Label(self.level.story1)
+        story2 = Label(self.level.story2)
         return GridBox(
-            children=self.index_grid_items([header, self.get_level_controls(False, False), info]),
+            children=self.index_grid_items([header, self.get_level_controls(False, False), image, story1, story2]),
             layout=Layout(
                 grid_template_rows='repeat(2, max-content)',
                 grid_template_columns='70% 30%',
                 grid_template_areas='''
                 "item0 item1"
-                "item2 ."
-                "item2 ."
+                "item2 item3"
+                "item2 item4"
                 ''')
        )
         return Label(self.level.text)
@@ -323,9 +331,9 @@ class InfoLevelView(LevelView):
 class MainView(object):
     def __init__(self):
         self.levels = [
-            InfoLevel("How are you?"),
+            InfoLevel("Bed time", "./images/sleep.png", "After a long day, it's time to go to sleep", "Click next level, to continue..."),
             StudyLineLevel(StudyLineModel(0.0, -1.0, 0.0), StudyLineModel(0.0, -1.0, -0.5), [True, True, True, True, True, False]),
-            InfoLevel("How are you?"),
+            InfoLevel("Header", "./images/sleep.png", "Story1", "Story2"),
             StudyLineLevel(StudyLineModel(1.0, 0.1, 0.0), StudyLineModel(1.0, 0.1, 0.5), [True, True, True, True, False, True]),
             StudyLineLevel(StudyLineModel(1.0, 0.9, 0.0), StudyLineModel(1.0, 0.4, 0.0), [True, True, True, False, True, True]),
             StudyLineLevel(StudyLineModel(1.0, -2.0, 0.0), StudyLineModel(1.0, -1.5, 0.0), [True, True, False, True, True, True]),
