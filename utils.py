@@ -32,6 +32,11 @@ class Images(Assets):
     def load_image(cls, image_file):
         return plt.imread(image_file)
 
+    @classmethod
+    def load_image_file(cls, file_name):
+        image_file = open(file_name, "rb")
+        return image_file.read()
+
 class Sounds(Assets):
     SOUND_DIR = os.path.join(Assets.DREAM_DIR, 'sounds')
 

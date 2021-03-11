@@ -1,7 +1,6 @@
 import copy
 import numpy as np
-import matplotlib.pyplot as plt
-from ipywidgets import Image, Layout, Button, VBox, HBox, Label, Box, GridBox
+from ipywidgets import Image, Layout, Button, VBox, HBox, Label, Box, GridBox, HTML
 from utils import WidgetsManager, Images, Sounds
 from levels import InfoLevel, StudyLineLevel, SplitMonstersLevelsFactory
 from models import LinearModel, StudyLineModel
@@ -64,7 +63,7 @@ class LevelView(object):
 
 class StatusObject(object):
     def __init__(self, file_name, x_offset, text_format, value, min_value = 0.0, max_value = 1.0):
-        self.img = plt.imread(file_name)
+        self.img = Images.load_image(file_name)
         self.x_offset = x_offset
         self.text_format = text_format
         self.value = value
@@ -297,19 +296,7 @@ class StudyLineLevelView(LevelView):
         return self.same_vector(v1, v2)
 
     def render(self):
-        header = self.get_game_status()
-        graph = self.graph.graph
-        self.controls = self.get_controls()
-        return GridBox(
-            children=self.index_grid_items([header, self.get_level_controls(), graph, self.controls]),
-            layout=Layout(
-                grid_template_rows='repeat(2, max-content)',
-                grid_template_columns='70% 30%',
-                grid_template_areas='''
-                "item0 item1"
-                "item2 item3"
-                ''')
-       )
+        return self.get_main_view([self.get_game_status(), self.get_level_controls(), self.graph.graph, self.get_controls()])
 
 class InfoLevelView(LevelView):
     def __init__(self, level, main_view):
@@ -318,41 +305,37 @@ class InfoLevelView(LevelView):
 
     def render(self):
         header = Label(self.level.header)
-        image_file = open(self.level.image_file, "rb")
-        image = image_file.read()
         image = Image(
-            value=image,
+            value=self.level.image,
             format='png',
             width=512,
             height=512,
         )
-        story1 = Label(self.level.story1)
-        story2 = Label(self.level.story2)
-        return GridBox(
-            children=self.index_grid_items([header, self.get_level_controls(False, False), image, story1, story2]),
-            layout=Layout(
-                grid_template_rows='repeat(2, max-content)',
-                grid_template_columns='70% 30%',
-                grid_template_areas='''
-                "item0 item1"
-                "item2 item3"
-                "item2 item4"
-                ''')
-       )
-        return Label(self.level.text)
+        story = HTML(self.level.story)
+
+        return self.get_main_view([header, self.get_level_controls(False, False), image, story])
 
 class MainView(object):
     def __init__(self):
-        self.levels = list(self.intro_info_levels()) + list(SplitMonstersLevelsFactory().get_levels()) + list(self.study_line_levels())
+        self.levels = list(self.intro_levels()) + list(self.study_line_levels())
         self.main_box = VBox(children=[])
         self.load_current_level(0)
 
-    def intro_info_levels(self):
-        yield InfoLevel("Bed time", "./images/sleep.png", "After a long day, it's time to go to sleep", "Click next level, to continue...")
+    def intro_levels(self):
+        yield InfoLevel("Bed time", "./images/sleep.png", "After a long day, it's time to go to sleep<br/>Click <b>Next level</b>, to continue...")
+        yield InfoLevel("Dream world", "./images/sleep.png", "Welcome to the <b>creators</b> world. You have been choosen to fight on the side of the future. We don't have time to train you, so I will set up magic interface for you, just cast spells and hope that you manage to fill up the <b>Acurasimus</b> before <b>Iterasimus</b> full")
+        yield from SplitMonstersLevelsFactory().get_intro_level()
+        yield InfoLevel("Dream world", "./images/sleep.png", "You lost this battle, but once you prepare yourself, you will be able to win. You need to train yourself to became a creator of the future. You can not practice while you awake. Today you can practice the magic of the future only in the dream, but you can prepare yourself for crossing the line between past and future, you can prepare yourself for the next night...")
+        yield InfoLevel("Morning", "./images/sleep.png", "What a strange dream, let me prepare myself for next dream")
+        yield InfoLevel("Preparation is boring", "./images/sleep.png", "This preparation is so boring, it make me sleepy")
+        yield InfoLevel("Dream world", "./images/sleep.png", "You have no chance, I will win again ...")
+        yield InfoLevel("Bed time", "./images/sleep.png", "Last night dream was crazy. I can not believe that I practice in the morning for the dream. What a silly move from my side. It's time to get to the bed. Time to go into darkness and get some rest")
+        yield InfoLevel("Dream world", "./images/sleep.png", "We are in the middle of the battle. Don't panic, you can win now. I know that you are not <b>creator</b> and you are scared, but just think that this is just magic for now. I will set up magic interface for you, fill up the <b>Acurasimus</b> before <b>Ierasimus</b> full")
+
 
     def study_line_levels(self):
         yield StudyLineLevel(StudyLineModel(0.0, -1.0, 0.0), StudyLineModel(0.0, -1.0, -0.5), [True, True, True, True, True, False])
-        yield InfoLevel("Header", "./images/sleep.png", "Story1", "Story2")
+        yield InfoLevel("Header", "./images/sleep.png", "Story1\nStory2")
         yield StudyLineLevel(StudyLineModel(1.0, 0.1, 0.0), StudyLineModel(1.0, 0.1, 0.5), [True, True, True, True, False, True])
         yield StudyLineLevel(StudyLineModel(1.0, 0.9, 0.0), StudyLineModel(1.0, 0.4, 0.0), [True, True, True, False, True, True])
         yield StudyLineLevel(StudyLineModel(1.0, -2.0, 0.0), StudyLineModel(1.0, -1.5, 0.0), [True, True, False, True, True, True])

@@ -18,13 +18,11 @@ class StudyLineLevel(Level):
         self.disabled_buttons = disabled_buttons
 
 class InfoLevel(Level):
-    def __init__(self, header, image_file, story1, story2):
+    def __init__(self, header, image_file, story):
         super(InfoLevel, self).__init__(LevelType.INFO)
         self.header = header
-        self.image_file = image_file
-        self.story1 = story1
-        self.story2 = story2
-
+        self.image = Images.load_image_file(image_file)
+        self.story = story
 
 class SplitMonstersLevel(Level):
     def __init__(self, levels, colors, monsters):
@@ -42,7 +40,7 @@ class MonsterInfo(object):
         self.target_level = target_level
 
 class SplitMonstersLevelsFactory(object):
-    def get_levels(self):
+    def get_intro_level(self):
         levels = [-100, 0, 100]
         colors = ['blue', 'yellow']
         monsters = [
