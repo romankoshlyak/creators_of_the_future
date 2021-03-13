@@ -1,5 +1,5 @@
 from enum import Enum
-from utils import Images
+from utils import Images, Sounds
 
 class LevelType(Enum):
     STUDY_LINE = 1
@@ -11,17 +11,20 @@ class Level(object):
         self.level_type = level_type
 
 class StudyLineLevel(Level):
-    def __init__(self, model, target_model, disabled_buttons):
+    def __init__(self, model, target_model, disabled_buttons, level_number, number_of_levels):
         super(StudyLineLevel, self).__init__(LevelType.STUDY_LINE)
         self.model = model
         self.target_model = target_model
         self.disabled_buttons = disabled_buttons
+        self.level_number = level_number
+        self.number_of_levels = number_of_levels
 
 class InfoLevel(Level):
-    def __init__(self, header, image_file, story):
+    def __init__(self, header, image_file, audio_file, story = None):
         super(InfoLevel, self).__init__(LevelType.INFO)
         self.header = header
         self.image = Images.load_image_file(image_file)
+        self.audio_file = Sounds.get_file(audio_file)
         self.story = story
 
 class SplitMonstersLevel(Level):

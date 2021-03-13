@@ -173,11 +173,7 @@ class StudyLineLevelView(LevelView):
         self.game_status.button_style = 'success'
 
     def update_game_status(self):
-        #if self.finished:
-        #    self.game_status.description = "You prepared for next dream".format(self.current_level_index+1, len(self.levels))
-        #    self.game_status.button_style = 'success'
-        #else:
-        self.game_status.description = "Level "#{}/{}".format(self.current_level_index+1, len(self.levels))
+        self.game_status.description = "Level #{}/{}".format(self.level.level_number, self.level.number_of_levels)
         self.game_status.button_style = 'success'
         self.game_status.button_style = 'info'
 
@@ -312,6 +308,7 @@ class InfoLevelView(LevelView):
             height=576,
         )
         story = HTML(self.level.story)
+        Sounds.play_audio(self.level.audio_file)
 
         return self.get_main_view([header, self.get_level_controls(False, False), image, story])
 
@@ -322,29 +319,30 @@ class MainView(object):
         self.load_current_level(0)
 
     def intro_levels(self):
-        yield InfoLevel("Bed time", "./images/sleep.jpg", "After a long day, it's time to go to sleep<br/>Click <b>Next level</b>, to continue...")
-        yield InfoLevel("Dream world", "./images/dream.jpg", "Welcome to the <b>creators</b> world. You have been choosen to fight on the side of the future. We don't have time to train you, so I will set up magic interface for you, just cast spells and hope that you manage to fill up the <b>Acurasimus</b> before <b>Iterasimus</b> full")
+        yield InfoLevel("After a long day", "./images/sleep.jpg", "after_a_long_day", "After a long day, it's time to go to sleep<br/>Click Next level, to continue...")
+        yield InfoLevel("Welcome", "./images/dream.jpg", "welcome", "Welcome to the creators world. You have been choosen to fight on the side of the future. There is no time to get a proper training, since we are in the middle of the battle, so I will set up magic interface for you. Just cast spells and we hope you will lead <b>Acurasimus</b> to the victory over <b>Iterasimus<b/>")
         yield from SplitMonstersLevelsFactory().get_intro_level()
-        yield InfoLevel("Dream world", "./images/dream.jpg", "You lost this battle, but once you prepare yourself, you will be able to win. You need to train yourself to became a creator of the future. You can not practice while you awake. Today you can practice the magic of the future only in the dream, but you can prepare yourself for crossing the line between past and future, you can prepare yourself for the next night...")
-        yield InfoLevel("Morning", "./images/wake_up.jpg", "What a strange dream, let me prepare myself for next dream")
-        yield InfoLevel("Preparation is boring", "./images/sleep.jpg", "This preparation is so boring, it make me sleepy")
-        yield InfoLevel("Dream world", "./images/dream.jpg", "You have no chance, I will win again ...")
-        yield InfoLevel("Bed time", "./images/sleep.jpg", "Last night dream was crazy. I can not believe that I practice in the morning for the dream. What a silly move from my side. It's time to get to the bed. Time to go into darkness and get some rest")
-        yield InfoLevel("Dream world", "./images/dream.jpg", "We are in the middle of the battle. Don't panic, you can win now. I know that you are not <b>creator</b> and you are scared, but just think that this is just magic for now. I will set up magic interface for you, fill up the <b>Acurasimus</b> before <b>Ierasimus</b> full")
+        yield InfoLevel("You had no chance", "./images/apoke.16_00040.png", "you_had_no_chance", "You had no chance to beat <b>Iterasimus</b>") 
+        yield InfoLevel("Oh... no", "./images/dream.jpg", "o_no", "Oh... no, you lost the battle. But the fight for the future is ongoing. We see the potential in you to became the greatest creator of all times, we will give you instructions how to prepare youself for the next night ...")
+        yield InfoLevel("What a strange night", "./images/wake_up.jpg", "what_a_strange_night", "What a strange night! Let me prepare myself for the next battle")
+        yield InfoLevel("You have no chance", "./images/apoke.16_00040.png", "you_have_no_chance", "You have no chance, I will win again ...")
+        yield InfoLevel("Last night was crazy", "./images/sleep.jpg", "last_night", "Last night was crazy. I can not believe I spent half of the day in the training. What a silly move from my side! Time to go into the darkness and get some rest ...")
+        yield InfoLevel("You are back", "./images/dream.jpg", "you_are_back", "You are back, we were waiting for you! Don't panic, you can win now. I know that you are not a real creator yet and you are scared, but I believe in you. Go and bring us a victory this time!")
+        yield InfoLevel("Congratulations", "./images/dream.jpg", "congratulations", "Congratulations! You earned your place among creators of the future. Now, you are ready to know what means to be a creator. By playing this game you actually studied machine learning. Join our secret group to continue your education and access to the next chapter of the game. Creators of the future are waiting for you https://www.facebook.com/groups/458107258671703")
 
 
     def study_line_levels(self):
-        yield StudyLineLevel(StudyLineModel(0.0, -1.0, 0.0), StudyLineModel(0.0, -1.0, -0.5), [True, True, True, True, True, False])
-        yield InfoLevel("Header", "./images/sleep.jpg", "Story1\nStory2")
-        yield StudyLineLevel(StudyLineModel(1.0, 0.1, 0.0), StudyLineModel(1.0, 0.1, 0.5), [True, True, True, True, False, True])
-        yield StudyLineLevel(StudyLineModel(1.0, 0.9, 0.0), StudyLineModel(1.0, 0.4, 0.0), [True, True, True, False, True, True])
-        yield StudyLineLevel(StudyLineModel(1.0, -2.0, 0.0), StudyLineModel(1.0, -1.5, 0.0), [True, True, False, True, True, True])
-        yield StudyLineLevel(StudyLineModel(-1.0, -2.0, 0.0), StudyLineModel(-1.5, -2.0, 0.0), [True, False, True, True, True, True])
-        yield StudyLineLevel(StudyLineModel(1.0, -2.0, 0.0), StudyLineModel(1.5, -2.0, 0.0), [False, True, True, True, True, True])
-        yield StudyLineLevel(StudyLineModel(0.5, 0.5, 0.0), StudyLineModel(0.7, 0.3, 0.0), [False, False, False, False, True, True])
-        yield StudyLineLevel(StudyLineModel(0.5, 0.5, 0.0), StudyLineModel(0.7, 0.3, 0.5), [])
-        yield StudyLineLevel(StudyLineModel(-0.5, -0.5, 0.0), StudyLineModel(0.7, 0.3, -0.3), [])
-        yield StudyLineLevel(StudyLineModel(1.0, 0.3, 0.0), StudyLineModel(-1.0, 0.3, -0.7), [])
+        yield StudyLineLevel(StudyLineModel(0.0, -1.0, 0.0), StudyLineModel(0.0, -1.0, -0.5), [True, True, True, True, True, False], 1, 10)
+        yield StudyLineLevel(StudyLineModel(1.0, 0.1, 0.0), StudyLineModel(1.0, 0.1, 0.5), [True, True, True, True, False, True], 2, 10)
+        yield StudyLineLevel(StudyLineModel(1.0, 0.9, 0.0), StudyLineModel(1.0, 0.4, 0.0), [True, True, True, False, True, True], 3, 10)
+        yield StudyLineLevel(StudyLineModel(1.0, -2.0, 0.0), StudyLineModel(1.0, -1.5, 0.0), [True, True, False, True, True, True], 4, 10)
+        yield StudyLineLevel(StudyLineModel(-1.0, -2.0, 0.0), StudyLineModel(-1.5, -2.0, 0.0), [True, False, True, True, True, True], 5, 10)
+        yield InfoLevel("Flashback", "./images/apoke.16_00040.png", "You have no chance, I will win again ...")
+        yield StudyLineLevel(StudyLineModel(1.0, -2.0, 0.0), StudyLineModel(1.5, -2.0, 0.0), [False, True, True, True, True, True], 6, 10)
+        yield StudyLineLevel(StudyLineModel(0.5, 0.5, 0.0), StudyLineModel(0.7, 0.3, 0.0), [False, False, False, False, True, True], 7, 10)
+        yield StudyLineLevel(StudyLineModel(0.5, 0.5, 0.0), StudyLineModel(0.7, 0.3, 0.5), [], 8, 10)
+        yield StudyLineLevel(StudyLineModel(-0.5, -0.5, 0.0), StudyLineModel(0.7, 0.3, -0.3), [], 9, 10)
+        yield StudyLineLevel(StudyLineModel(1.0, 0.3, 0.0), StudyLineModel(-1.0, 0.3, -0.7), [], 10, 10)
 
     def get_view_for_level(self, level):
         if level.level_type == LevelType.STUDY_LINE:
