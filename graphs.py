@@ -60,27 +60,27 @@ class MonsterGraph(object):
         return output.view(-1).numpy()
 
     def draw_point(self, ax, monster, output_level, colors):
+        m_size = self.view.calc_monster_size()
         x = monster.x
         y = monster.y
         target_level = monster.target_level
         match_color = 'green' if monster.target_level == output_level else 'red'
-        target_circle = plt.Circle((x, y), 0.03*self.m_size, color=colors[target_level], zorder=2)
-        output_circle = plt.Circle((x, y), 0.04*self.m_size, color=colors[output_level], zorder=2)
-        correct_circle = plt.Circle((x, y), 0.05*self.m_size, color=match_color, zorder=2)
+        target_circle = plt.Circle((x, y), 0.03*m_size, color=colors[target_level], zorder=2)
+        output_circle = plt.Circle((x, y), 0.04*m_size, color=colors[output_level], zorder=2)
+        correct_circle = plt.Circle((x, y), 0.05*m_size, color=match_color, zorder=2)
         ax.add_patch(correct_circle)
         ax.add_patch(output_circle)
         ax.add_patch(target_circle)
-        ax.imshow(monster.image, extent=[x-0.05*self.m_size, x+0.05*self.m_size, y-0.05*self.m_size, y+0.05*self.m_size], zorder=2)
+        ax.imshow(monster.image, extent=[x-0.05*m_size, x+0.05*m_size, y-0.05*m_size, y+0.05*m_size], zorder=2)
 
     def render(self, a):
-        self.m_size += 1
         x = np.array([monster.x for monster in self.view.level.monsters])
         y = np.array([monster.y for monster in self.view.level.monsters])
         output = self.model_prediction(x, y)
-        min_x = math.floor(np.min(x)-1.0)
-        max_x = math.ceil(np.max(x)+1.0)
-        min_y = math.floor(np.min(y)-1.0)
-        max_y = math.ceil(np.max(y)+1.0)
+        min_x = -3.0
+        max_x = 3.0
+        min_y = -3.0
+        max_y = 3.0
         xgrid = (min_x, max_x, 0.1)
         ygrid = (min_y, max_y, 0.1)
         X, Y = np.meshgrid(self.np_points(xgrid), self.np_points(ygrid))

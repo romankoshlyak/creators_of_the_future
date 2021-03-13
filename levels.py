@@ -1,5 +1,6 @@
 from enum import Enum
 from utils import Images, Sounds
+from models import LinearModel
 
 class LevelType(Enum):
     STUDY_LINE = 1
@@ -28,12 +29,17 @@ class InfoLevel(Level):
         self.story = story
 
 class SplitMonstersLevel(Level):
-    def __init__(self, levels, colors, monsters):
+    def __init__(self, model, levels, colors, monsters):
         super(SplitMonstersLevel, self).__init__(LevelType.SPLIT_MONSTERS)
+        self.model = model
         self.levels = levels
         self.colors = colors
         self.monsters = monsters
-        self.max_iterations = 3
+        self.max_iterations = 10
+
+    def set_max_iterations(self, max_iterations):
+        self.max_iterations = max_iterations
+        return self
 
 class MonsterInfo(object):
     def __init__(self, x, y, image_file, target_level):
@@ -44,12 +50,55 @@ class MonsterInfo(object):
 
 class SplitMonstersLevelsFactory(object):
     def get_intro_level(self):
+        model = LinearModel(0.5, 0.0, 0.0)
         levels = [-100, 0, 100]
         colors = ['blue', 'yellow']
         monsters = [
             MonsterInfo(-2.0, -2.0, Images.BLUE_MONSTER, 0),
-            MonsterInfo(-2.0, 2.0, Images.BLUE_MONSTER, 0),
-            MonsterInfo(2.0, -2.0, Images.YELLOW_MONSTER, 1),
+            MonsterInfo(0.0, -2.0, Images.BLUE_MONSTER, 0),
+            MonsterInfo(2.0, -2.0, Images.BLUE_MONSTER, 0),
+            MonsterInfo(-2.0, 2.0, Images.YELLOW_MONSTER, 1),
+            MonsterInfo(0.0, 2.0, Images.YELLOW_MONSTER, 1),
             MonsterInfo(2.0, 2.0, Images.YELLOW_MONSTER, 1)
         ]
-        yield SplitMonstersLevel(levels, colors, monsters) 
+        yield SplitMonstersLevel(model, levels, colors, monsters).set_max_iterations(3)
+
+    def get_main_levels(self):
+        model = LinearModel(0.5, 0.0, 0.0)
+        levels = [-100, 0, 100]
+        colors = ['blue', 'yellow']
+        monsters = [
+            MonsterInfo(-2.0, -2.0, Images.BLUE_MONSTER, 0),
+            MonsterInfo(0.0, -2.0, Images.BLUE_MONSTER, 0),
+            MonsterInfo(2.0, -2.0, Images.BLUE_MONSTER, 0),
+            MonsterInfo(-2.0, 2.0, Images.YELLOW_MONSTER, 1),
+            MonsterInfo(0.0, 2.0, Images.YELLOW_MONSTER, 1),
+            MonsterInfo(2.0, 2.0, Images.YELLOW_MONSTER, 1)
+        ]
+        yield SplitMonstersLevel(model, levels, colors, monsters)
+
+        model = LinearModel(0.5, 0.0, 0.0)
+        levels = [-100, 0, 100]
+        colors = ['blue', 'yellow']
+        monsters = [
+            MonsterInfo(-2.0, 2.0, Images.BLUE_MONSTER, 0),
+            MonsterInfo(0.0, 2.0, Images.BLUE_MONSTER, 0),
+            MonsterInfo(2.0, 2.0, Images.BLUE_MONSTER, 0),
+            MonsterInfo(-2.0, 1.0, Images.YELLOW_MONSTER, 1),
+            MonsterInfo(0.0, 1.0, Images.YELLOW_MONSTER, 1),
+            MonsterInfo(2.0, 1.0, Images.YELLOW_MONSTER, 1)
+        ]
+        yield SplitMonstersLevel(model, levels, colors, monsters).set_max_iterations(30)
+
+        model = LinearModel(-0.5, 0.5, 1.0)
+        levels = [-100, 0, 100]
+        colors = ['blue', 'yellow']
+        monsters = [
+            MonsterInfo(1.0, 2.0, Images.BLUE_MONSTER, 0),
+            MonsterInfo(2.0, 1.0, Images.BLUE_MONSTER, 0),
+            MonsterInfo(-2.0, -2.0, Images.BLUE_MONSTER, 0),
+            MonsterInfo(2.0, -2.0, Images.YELLOW_MONSTER, 1),
+            #MonsterInfo(0.0, 1.0, Images.YELLOW_MONSTER, 1),
+            #MonsterInfo(2.0, 1.0, Images.YELLOW_MONSTER, 1)
+        ]
+        yield SplitMonstersLevel(model, levels, colors, monsters).set_max_iterations(30)

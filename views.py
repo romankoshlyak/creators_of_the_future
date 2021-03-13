@@ -78,7 +78,12 @@ class MonsterLevelView(LevelView):
         self.accuracy = StatusObject(Images.ACCURACY, 2.0, "Acurasimus\n {0:.2f}/{1}", 0.0)
         self.iteration = StatusObject(Images.ITERATION, 5.0, "Iterasimus\n {0}/{1}", 0, 0, self.level.max_iterations)
         self.bar_graph = BarGraph([self.accuracy, self.iteration])
-        self.main_graph = MonsterGraph(LinearModel(0.5, 0.5, 0.0), self)
+        self.monster_min_size = 2.0
+        self.monster_max_size = 10.0
+        self.main_graph = MonsterGraph(self.level.model, self)
+
+    def calc_monster_size(self):
+        return (self.monster_max_size-self.monster_min_size)*(self.iteration.value)/self.level.max_iterations+self.monster_min_size
 
     def update_status(self, accuracy):
         self.accuracy.value = accuracy
@@ -314,9 +319,14 @@ class InfoLevelView(LevelView):
 
 class MainView(object):
     def __init__(self):
-        self.levels = list(self.intro_levels()) + list(self.study_line_levels())
+        self.levels = list(self.all_levels())
         self.main_box = VBox(children=[])
         self.load_current_level(0)
+
+    def all_levels(self):
+        #yield from self.intro_levels()
+        #yield from self.study_line_levels()
+        yield from self.monster_levels()
 
     def intro_levels(self):
         yield InfoLevel("After a long day", "./images/sleep.jpg", "after_a_long_day", "After a long day, it's time to go to sleep<br/>Click Next level, to continue...")
@@ -324,25 +334,26 @@ class MainView(object):
         yield from SplitMonstersLevelsFactory().get_intro_level()
         yield InfoLevel("You had no chance", "./images/apoke.16_00040.png", "you_had_no_chance", "You had no chance to beat <b>Iterasimus</b>") 
         yield InfoLevel("Oh... no", "./images/dream.jpg", "o_no", "Oh... no, you lost the battle. But the fight for the future is ongoing. We see the potential in you to became the greatest creator of all times, we will give you instructions how to prepare youself for the next night ...")
-        yield InfoLevel("What a strange night", "./images/wake_up.jpg", "what_a_strange_night", "What a strange night! Let me prepare myself for the next battle")
-        yield InfoLevel("You have no chance", "./images/apoke.16_00040.png", "you_have_no_chance", "You have no chance, I will win again ...")
-        yield InfoLevel("Last night was crazy", "./images/sleep.jpg", "last_night", "Last night was crazy. I can not believe I spent half of the day in the training. What a silly move from my side! Time to go into the darkness and get some rest ...")
-        yield InfoLevel("You are back", "./images/dream.jpg", "you_are_back", "You are back, we were waiting for you! Don't panic, you can win now. I know that you are not a real creator yet and you are scared, but I believe in you. Go and bring us a victory this time!")
-        yield InfoLevel("Congratulations", "./images/dream.jpg", "congratulations", "Congratulations! You earned your place among creators of the future. Now, you are ready to know what means to be a creator. By playing this game you actually studied machine learning. Join our secret group to continue your education and access to the next chapter of the game. Creators of the future are waiting for you https://www.facebook.com/groups/458107258671703")
-
 
     def study_line_levels(self):
+        yield InfoLevel("What a strange night", "./images/wake_up.jpg", "what_a_strange_night", "What a strange night! Let me prepare myself for the next battle")
         yield StudyLineLevel(StudyLineModel(0.0, -1.0, 0.0), StudyLineModel(0.0, -1.0, -0.5), [True, True, True, True, True, False], 1, 10)
         yield StudyLineLevel(StudyLineModel(1.0, 0.1, 0.0), StudyLineModel(1.0, 0.1, 0.5), [True, True, True, True, False, True], 2, 10)
         yield StudyLineLevel(StudyLineModel(1.0, 0.9, 0.0), StudyLineModel(1.0, 0.4, 0.0), [True, True, True, False, True, True], 3, 10)
         yield StudyLineLevel(StudyLineModel(1.0, -2.0, 0.0), StudyLineModel(1.0, -1.5, 0.0), [True, True, False, True, True, True], 4, 10)
         yield StudyLineLevel(StudyLineModel(-1.0, -2.0, 0.0), StudyLineModel(-1.5, -2.0, 0.0), [True, False, True, True, True, True], 5, 10)
-        yield InfoLevel("Flashback", "./images/apoke.16_00040.png", "You have no chance, I will win again ...")
+        yield InfoLevel("You have no chance", "./images/apoke.16_00040.png", "you_have_no_chance", "You have no chance, I will win again ...")
         yield StudyLineLevel(StudyLineModel(1.0, -2.0, 0.0), StudyLineModel(1.5, -2.0, 0.0), [False, True, True, True, True, True], 6, 10)
         yield StudyLineLevel(StudyLineModel(0.5, 0.5, 0.0), StudyLineModel(0.7, 0.3, 0.0), [False, False, False, False, True, True], 7, 10)
         yield StudyLineLevel(StudyLineModel(0.5, 0.5, 0.0), StudyLineModel(0.7, 0.3, 0.5), [], 8, 10)
         yield StudyLineLevel(StudyLineModel(-0.5, -0.5, 0.0), StudyLineModel(0.7, 0.3, -0.3), [], 9, 10)
         yield StudyLineLevel(StudyLineModel(1.0, 0.3, 0.0), StudyLineModel(-1.0, 0.3, -0.7), [], 10, 10)
+
+    def monster_levels(self):
+        #yield InfoLevel("Last night was crazy", "./images/sleep.jpg", "last_night", "Last night was crazy. I can not believe I spent half of the day in the training. What a silly move from my side! Time to go into the darkness and get some rest ...")
+        #yield InfoLevel("You are back", "./images/dream.jpg", "you_are_back", "You are back, we were waiting for you! Don't panic, you can win now. I know that you are not a real creator yet and you are scared, but I believe in you. Go and bring us a victory this time!")
+        yield from SplitMonstersLevelsFactory().get_main_levels()
+        yield InfoLevel("Congratulations", "./images/dream.jpg", "congratulations", "Congratulations! You earned your place among creators of the future. Now, you are ready to know what means to be a creator. By playing this game you actually studied machine learning. Join our secret group to continue your education and access to the next chapter of the game. Creators of the future are waiting for you https://www.facebook.com/groups/458107258671703")
 
     def get_view_for_level(self, level):
         if level.level_type == LevelType.STUDY_LINE:
