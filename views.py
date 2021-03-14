@@ -94,6 +94,7 @@ class MonsterLevelView(LevelView):
 
     def update_status(self, accuracy):
         self.accuracy.value = accuracy
+        self.bar_graph.rerender()
 
     def update_model(self):
         self.widgets_manager.disable_widgets()
