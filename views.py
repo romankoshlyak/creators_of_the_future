@@ -205,12 +205,10 @@ class StudyLineLevelView(LevelView):
        )
 
     def update_model(self):
-        if self.is_same_line(self.level.model, self.level.target_model):
-            self.next_level_button.disabled = False
+        self.next_level_button.disabled = not self.is_same_line(self.level.model, self.level.target_model)
         self.widgets_manager.disable_widgets()
         self.graph.rerender()
-        if self.next_level_button.disabled:
-            self.widgets_manager.enable_widgets()
+        self.widgets_manager.enable_widgets()
 
     def disable_buttons(self, buttons, disabled_buttons):
         for disabled, button in zip(disabled_buttons, buttons):
@@ -331,7 +329,7 @@ class MainView(object):
 
     def all_levels(self):
         #yield from self.intro_levels()
-        #yield from self.study_line_levels()
+        yield from self.study_line_levels()
         yield from self.monster_levels()
 
     def intro_levels(self):
