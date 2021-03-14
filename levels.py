@@ -27,6 +27,11 @@ class InfoLevel(Level):
         self.image = Images.load_image_file(image_file)
         self.audio_file = Sounds.get_file(audio_file)
         self.story = story
+        self.hide_next_button = False
+
+    def set_hide_next_button(self, hide_next_button):
+        self.hide_next_button = hide_next_button
+        return self
 
 class SplitMonstersLevel(Level):
     def __init__(self, model, levels, colors, monsters):

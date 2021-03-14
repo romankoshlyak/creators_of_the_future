@@ -43,7 +43,7 @@ class LevelView(object):
                 ''')
         )
 
-    def get_level_controls(self, show_restart_button = True, disable_next_button = True):
+    def get_level_controls(self, show_restart_button = True, disable_next_button = True, hide_next_button = False):
         items = []
         if show_restart_button:
             items.append(self.create_button('Restart level', RestartLevelAction(self), False))
@@ -52,7 +52,10 @@ class LevelView(object):
         self.next_level_button = self.create_button('Next level', NextLevelAction(self), False)
         if disable_next_button:
             self.next_level_button.disabled = True
-        items.append(self.next_level_button)
+        if hide_next_button:
+            items.append(Label(""))
+        else:
+            items.append(self.next_level_button)
 
         items = self.index_grid_items(items)
         return GridBox(
@@ -323,7 +326,7 @@ class InfoLevelView(LevelView):
         story = HTML(self.level.story)
         Sounds.play_audio(self.level.audio_file)
 
-        return self.get_main_view([header, self.get_level_controls(False, False), image, story])
+        return self.get_main_view([header, self.get_level_controls(False, False, self.level.hide_next_button), image, story])
 
 class MainView(object):
     def __init__(self):
@@ -337,8 +340,8 @@ class MainView(object):
         yield from self.monster_levels()
 
     def intro_levels(self):
-        #yield InfoLevel("After a long day", "./images/sleep.jpg", "after_a_long_day", "After a long day, it's time to go to sleep<br/>Click Next level, to continue...")
-        #yield InfoLevel("Welcome", "./images/dream.jpg", "welcome", "Welcome to the creators world. You have been choosen to fight on the side of the future. There is no time to get a proper training, since we are in the middle of the battle, so I will set up magic interface for you. Just cast spells and we hope you will lead <b>Acurasimus</b> to the victory over <b>Iterasimus<b/>")
+        yield InfoLevel("After a long day", "./images/sleep.jpg", "after_a_long_day", "After a long day, it's time to go to sleep<br/>Click Next level, to continue...")
+        yield InfoLevel("Welcome", "./images/dream.jpg", "welcome", "Welcome to the creators world. You have been choosen to fight on the side of the future. There is no time to get a proper training, since we are in the middle of the battle, so I will set up magic interface for you. Just cast spells and we hope you will lead <b>Acurasimus</b> to the victory over <b>Iterasimus<b/>")
         yield from SplitMonstersLevelsFactory().get_intro_level()
         yield InfoLevel("You had no chance", "./images/apoke.16_00040.png", "you_had_no_chance", "You had no chance to beat <b>Iterasimus</b>") 
         yield InfoLevel("Oh... no", "./images/dream.jpg", "o_no", "Oh... no, you lost the battle. But the fight for the future is ongoing. We see the potential in you to became the greatest creator of all times, we will give you instructions how to prepare youself for the next night ...")
@@ -361,7 +364,7 @@ class MainView(object):
         yield InfoLevel("Last night was crazy", "./images/sleep.jpg", "last_night", "Last night was crazy. I can not believe I spent half of the day in the training. What a silly move from my side! Time to go into the darkness and get some rest ...")
         yield InfoLevel("You are back", "./images/dream.jpg", "you_are_back", "You are back, we were waiting for you! Don't panic, you can win now. I know that you are not a real creator yet and you are scared, but I believe in you. Go and bring us a victory this time!")
         yield from SplitMonstersLevelsFactory().get_main_levels()
-        yield InfoLevel("Congratulations", "./images/dream.jpg", "congratulations", "Congratulations! You earned your place among creators of the future. Now, you are ready to know what means to be a creator. By playing this game you actually studied machine learning. Join our secret group to continue your education and access to the next chapter of the game. Creators of the future are waiting for you https://www.facebook.com/groups/458107258671703")
+        yield InfoLevel("Congratulations", "./images/dream.jpg", "congratulations", "Congratulations! You earned your place among creators of the future. Now, you are ready to know what means to be a creator. By playing this game you actually studied machine learning. Join our secret group to continue your education and access to the next chapter of the game. Creators of the future are waiting for you https://www.facebook.com/groups/458107258671703").set_hide_next_button(True)
 
     def get_view_for_level(self, level):
         if level.level_type == LevelType.STUDY_LINE:
