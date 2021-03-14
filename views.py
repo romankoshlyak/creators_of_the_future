@@ -99,6 +99,7 @@ class MonsterLevelView(LevelView):
             self.iteration.value += 1
         if self.iteration.value < self.level.max_iterations:
             self.widgets_manager.enable_widgets()
+        self.next_level_button.disabled = self.accuracy.value < 1.0-1e-7
         self.bar_graph.rerender()
 
     def button_name_to_audio_file(self, button_name):
