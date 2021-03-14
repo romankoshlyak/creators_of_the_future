@@ -82,9 +82,10 @@ class MonsterLevelView(LevelView):
     def __init__(self, level, main_view):
         super(MonsterLevelView, self).__init__(main_view)
         self.level = level
-        self.accuracy = StatusObject(Images.ACCURACY, 2.0, "Acurasimus\n {0:.2f}/{1}", 0.0)
-        self.iteration = StatusObject(Images.ITERATION, 5.0, "Iterasimus\n {0}/{1}", 0, 0, self.level.max_iterations)
-        self.bar_graph = BarGraph([self.accuracy, self.iteration])
+        self.accuracy = StatusObject(Images.ACCURACY_MONSTER, 0.5, "Acurasimus\n {0:.2f}/{1}", 0.0)
+        self.iteration = StatusObject(Images.ITERATION_MONSTER, 3.5, "Iterasimus\n {0}/{1}", 0, 0, self.level.max_iterations)
+        self.level_status = StatusObject(Images.LEVEL_MONSTER, 6.0, "Level\n {0}/{1}", self.level.level_number, 0, self.level.number_of_levels)
+        self.bar_graph = BarGraph([self.accuracy, self.iteration, self.level_status])
         self.monster_min_size = 3.0
         self.monster_max_size = 10.0
         self.main_graph = MonsterGraph(self.level.model, self)
@@ -336,8 +337,8 @@ class MainView(object):
         self.load_current_level(0)
 
     def all_levels(self):
-        yield from self.intro_levels()
-        yield from self.study_line_levels()
+        #yield from self.intro_levels()
+        #yield from self.study_line_levels()
         yield from self.monster_levels()
 
     def intro_levels(self):

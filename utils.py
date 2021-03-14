@@ -23,10 +23,9 @@ class Assets(object):
 
 class Images(Assets):
     IMAGES_DIR = os.path.join(Assets.DREAM_DIR, 'images')
-    ACCURACY = os.path.join(IMAGES_DIR, 'apoke.04_00067.png')
-    ITERATION = os.path.join(IMAGES_DIR, 'apoke.16_00040.png')
-    BLUE_MONSTER = os.path.join(IMAGES_DIR, 'apoke.04_00067.png')
-    YELLOW_MONSTER = os.path.join(IMAGES_DIR, 'apoke.16_00040.png')
+    ACCURACY_MONSTER = os.path.join(IMAGES_DIR, 'apoke.04_00067.png')
+    ITERATION_MONSTER = os.path.join(IMAGES_DIR, 'apoke.16_00040.png')
+    LEVEL_MONSTER = os.path.join(IMAGES_DIR, 'apoke.22_00039.png')
     DINO_MONSTER = os.path.join(IMAGES_DIR, 'apoke.03_00046.png')
     SNOW_MONSTER = os.path.join(IMAGES_DIR, 'apoke.09_00038.png')
 

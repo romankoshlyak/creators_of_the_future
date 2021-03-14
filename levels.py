@@ -34,12 +34,14 @@ class InfoLevel(Level):
         return self
 
 class SplitMonstersLevel(Level):
-    def __init__(self, model, levels, colors, monsters):
+    def __init__(self, model, levels, colors, monsters, level_number, number_of_levels):
         super(SplitMonstersLevel, self).__init__(LevelType.SPLIT_MONSTERS)
         self.model = model
         self.levels = levels
         self.colors = colors
         self.monsters = monsters
+        self.level_number = level_number
+        self.number_of_levels = number_of_levels
         self.max_iterations = 10
         self.hide_restart_button = False
 
@@ -71,7 +73,7 @@ class SplitMonstersLevelsFactory(object):
             MonsterInfo(0.0, 2.0, Images.SNOW_MONSTER, 1),
             MonsterInfo(2.0, 2.0, Images.SNOW_MONSTER, 1)
         ]
-        yield SplitMonstersLevel(model, levels, colors, monsters).set_max_iterations(3).set_hide_restart_button(True)
+        yield SplitMonstersLevel(model, levels, colors, monsters, 1, 1).set_max_iterations(3).set_hide_restart_button(True)
 
     def get_main_levels(self):
         model = LinearModel(0.5, 0.0, 0.0)
@@ -85,7 +87,7 @@ class SplitMonstersLevelsFactory(object):
             MonsterInfo(0.0, 2.0, Images.SNOW_MONSTER, 1),
             MonsterInfo(2.0, 2.0, Images.SNOW_MONSTER, 1)
         ]
-        yield SplitMonstersLevel(model, levels, colors, monsters)
+        yield SplitMonstersLevel(model, levels, colors, monsters, 1, 3)
 
         model = LinearModel(0.5, 0.0, 0.0)
         levels = [-100, 0, 100]
@@ -98,7 +100,7 @@ class SplitMonstersLevelsFactory(object):
             MonsterInfo(0.0, 1.0, Images.SNOW_MONSTER, 1),
             MonsterInfo(2.0, 1.0, Images.SNOW_MONSTER, 1)
         ]
-        yield SplitMonstersLevel(model, levels, colors, monsters).set_max_iterations(30)
+        yield SplitMonstersLevel(model, levels, colors, monsters, 2, 3).set_max_iterations(30)
 
         model = LinearModel(-0.5, 0.5, 1.0)
         levels = [-100, 0, 100]
@@ -109,4 +111,4 @@ class SplitMonstersLevelsFactory(object):
             MonsterInfo(-2.0, -2.0, Images.DINO_MONSTER, 0),
             MonsterInfo(2.0, -2.0, Images.SNOW_MONSTER, 1),
         ]
-        yield SplitMonstersLevel(model, levels, colors, monsters).set_max_iterations(30)
+        yield SplitMonstersLevel(model, levels, colors, monsters, 3, 3).set_max_iterations(30)
