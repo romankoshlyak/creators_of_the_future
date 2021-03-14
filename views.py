@@ -16,15 +16,19 @@ class LevelView(object):
     def do_next_level(self):
         self.main_view.do_next_level()
 
+    def do_restart_level(self):
+        self.main_view.do_restart_level()
+
     def index_grid_items(self, items):
         for index in range(len(items)):
             items[index].layout.grid_area = "item{}".format(index)
         return items
 
-    def create_button(self, name, action):
+    def create_button(self, name, action, is_widget = True):
         button = Button(description=name)
         button.on_click(action.do_action)
-        self.widgets_manager.add_widget(button)
+        if is_widget:
+            self.widgets_manager.add_widget(button)
         return button
 
     def get_main_view(self, items):
@@ -42,10 +46,10 @@ class LevelView(object):
     def get_level_controls(self, show_restart_button = True, disable_next_button = True):
         items = []
         if show_restart_button:
-            items.append(self.create_button('Restart level', RestartLevelAction(self)))
+            items.append(self.create_button('Restart level', RestartLevelAction(self), False))
         else:
             items.append(Label(""))
-        self.next_level_button = self.create_button('Next level', NextLevelAction(self))
+        self.next_level_button = self.create_button('Next level', NextLevelAction(self), False)
         if disable_next_button:
             self.next_level_button.disabled = True
         items.append(self.next_level_button)
@@ -87,15 +91,15 @@ class MonsterLevelView(LevelView):
 
     def update_status(self, accuracy):
         self.accuracy.value = accuracy
-        self.iteration.value += 1
-        if self.iteration.value == self.level.max_iterations:
-            self.main_view.do_next_level()
-        self.bar_graph.rerender()
 
     def update_model(self):
         self.widgets_manager.disable_widgets()
         self.main_graph.rerender()
-        self.widgets_manager.enable_widgets()
+        if self.iteration.value < self.level.max_iterations:
+            self.iteration.value += 1
+        if self.iteration.value < self.level.max_iterations:
+            self.widgets_manager.enable_widgets()
+        self.bar_graph.rerender()
 
     def button_name_to_audio_file(self, button_name):
         sound_name = '_'.join(button_name.lower().split())
@@ -123,7 +127,8 @@ class MonsterLevelView(LevelView):
         return VBox(children=all_parameter_controls)
 
     def render(self):
-        return self.get_main_view([self.bar_graph.graph, self.get_level_controls(False), self.main_graph.graph, self.get_controls(self.main_graph)])
+        show_restart_button = not self.level.hide_restart_button
+        return self.get_main_view([self.bar_graph.graph, self.get_level_controls(show_restart_button), self.main_graph.graph, self.get_controls(self.main_graph)])
 
 class StudyLineLevelView(LevelView):
     PARAM_NAMES = ['Weight 0', 'Weight 1', 'Bias']
@@ -365,6 +370,9 @@ class MainView(object):
 
     def do_next_level(self):
         self.load_current_level(self.current_level_index+1)
+
+    def do_restart_level(self):
+        self.load_current_level(self.current_level_index)
 
     def load_current_level(self, index):
         self.current_level_index = index

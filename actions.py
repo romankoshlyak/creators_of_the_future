@@ -60,14 +60,8 @@ class NextLevelAction(ButtonAction):
         self.view.do_next_level()
 
 class RestartLevelAction(ButtonAction):
-    def __init__(self, application):
-        self.application = application
+    def __init__(self, view):
+        self.view = view
 
     def do_action(self, *args):
-        app = self.application
-        app.load_current_level(app.current_level_index)
-        app.controls.children = app.get_controls_items()
-        app.next_level_button.disabled = True
-        app.finished = False
-        app.update_game_status()
-        app.update_model()
+        self.view.do_restart_level()

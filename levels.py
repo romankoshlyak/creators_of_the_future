@@ -36,9 +36,14 @@ class SplitMonstersLevel(Level):
         self.colors = colors
         self.monsters = monsters
         self.max_iterations = 10
+        self.hide_restart_button = False
 
     def set_max_iterations(self, max_iterations):
         self.max_iterations = max_iterations
+        return self
+
+    def set_hide_restart_button(self, hide_restart_button):
+        self.hide_restart_button = hide_restart_button
         return self
 
 class MonsterInfo(object):
