@@ -66,7 +66,7 @@ class SplitMonstersLevelsFactory(object):
             MonsterInfo(0.0, 2.0, Images.YELLOW_MONSTER, 1),
             MonsterInfo(2.0, 2.0, Images.YELLOW_MONSTER, 1)
         ]
-        yield SplitMonstersLevel(model, levels, colors, monsters).set_max_iterations(3)
+        yield SplitMonstersLevel(model, levels, colors, monsters).set_max_iterations(3).set_hide_restart_button(True)
 
     def get_main_levels(self):
         model = LinearModel(0.5, 0.0, 0.0)
