@@ -82,21 +82,21 @@ class MonsterLevelView(LevelView):
         self.accuracy = StatusObject(Images.ACCURACY, 2.0, "Acurasimus\n {0:.2f}/{1}", 0.0)
         self.iteration = StatusObject(Images.ITERATION, 5.0, "Iterasimus\n {0}/{1}", 0, 0, self.level.max_iterations)
         self.bar_graph = BarGraph([self.accuracy, self.iteration])
-        self.monster_min_size = 2.0
+        self.monster_min_size = 3.0
         self.monster_max_size = 10.0
         self.main_graph = MonsterGraph(self.level.model, self)
 
     def calc_monster_size(self):
-        return (self.monster_max_size-self.monster_min_size)*(self.iteration.value)/self.level.max_iterations+self.monster_min_size
+        return (self.monster_max_size-self.monster_min_size)*(self.iteration.value)/float(self.level.max_iterations)+self.monster_min_size
 
     def update_status(self, accuracy):
         self.accuracy.value = accuracy
 
     def update_model(self):
         self.widgets_manager.disable_widgets()
-        self.main_graph.rerender()
         if self.iteration.value < self.level.max_iterations:
             self.iteration.value += 1
+        self.main_graph.rerender()
         if self.iteration.value < self.level.max_iterations:
             self.widgets_manager.enable_widgets()
         self.next_level_button.disabled = self.accuracy.value < 1.0-1e-7

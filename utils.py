@@ -27,6 +27,8 @@ class Images(Assets):
     ITERATION = os.path.join(IMAGES_DIR, 'apoke.16_00040.png')
     BLUE_MONSTER = os.path.join(IMAGES_DIR, 'apoke.04_00067.png')
     YELLOW_MONSTER = os.path.join(IMAGES_DIR, 'apoke.16_00040.png')
+    DINO_MONSTER = os.path.join(IMAGES_DIR, 'apoke.03_00046.png')
+    SNOW_MONSTER = os.path.join(IMAGES_DIR, 'apoke.09_00038.png')
 
     @classmethod
     def load_image(cls, image_file):
