@@ -337,8 +337,8 @@ class MainView(object):
         self.load_current_level(0)
 
     def all_levels(self):
-        #yield from self.intro_levels()
-        #yield from self.study_line_levels()
+        yield from self.intro_levels()
+        yield from self.study_line_levels()
         yield from self.monster_levels()
 
     def intro_levels(self):
