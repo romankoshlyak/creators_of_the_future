@@ -43,11 +43,14 @@ class Sounds(Assets):
 
     @classmethod
     def get_file(cls, sound_name):
+        if sound_name is None:
+            return None
         file_name = f'{sound_name}.m4a'
         return os.path.join(Sounds.SOUND_DIR, file_name)
 
     @classmethod
     def play_audio(cls, file_name):
-        data = open(file_name, "rb").read()
-        audio64 = base64.b64encode(data).decode('ascii')
-        output.eval_js(f'new Audio("data:audio/wav;base64,{audio64}").play()')
+        if file_name is not None:
+            data = open(file_name, "rb").read()
+            audio64 = base64.b64encode(data).decode('ascii')
+            output.eval_js(f'new Audio("data:audio/wav;base64,{audio64}").play()')

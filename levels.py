@@ -11,23 +11,32 @@ class LevelType(Enum):
     STUDY_PLANE = 4
 
 class Level(object):
-    def __init__(self, level_type):
+    def __init__(self, level_type, level_number = 1, number_of_levels = 1):
         self.level_type = level_type
-
-class StudyLineLevel(Level):
-    def __init__(self, model, target_model, disabled_buttons, level_number, number_of_levels):
-        super(StudyLineLevel, self).__init__(LevelType.STUDY_LINE)
-        self.model = model
-        self.target_model = target_model
-        self.disabled_buttons = disabled_buttons
         self.level_number = level_number
         self.number_of_levels = number_of_levels
 
+class StudyLineLevel(Level):
+    def __init__(self, model, target_model, disabled_buttons, level_number, number_of_levels):
+        super().__init__(LevelType.STUDY_LINE, level_number, number_of_levels)
+        self.model = model
+        self.target_model = target_model
+        self.disabled_buttons = disabled_buttons
+
+
+class ErrorType(Enum):
+    SUM_LINEAR = 1
+    MEAN_LINEAR = 2
+    SUM_SQUARED = 3
+    MEAN_SQUARED = 4
+
 class StudyPlaneLevel(Level):
-    def __init__(self, model, points):
-        super(StudyPlaneLevel, self).__init__(LevelType.STUDY_PLANE)
+    def __init__(self, model, points, error_type, error_limit, level_number, number_of_levels):
+        super().__init__(LevelType.STUDY_PLANE, level_number, number_of_levels)
         self.model = model
         self.points = points
+        self.error_type = error_type
+        self.error_limit = error_limit
 
 class PointInfo(object):
     def __init__(self, x, y, target):
@@ -43,16 +52,23 @@ class StudyPlaneLevelFactory(object):
         output = target_model(self.get_tensor(points)).view(-1).tolist()
         return [PointInfo(x, y, z) for (x, y), z in zip(points, output)]
 
-
-    def get_test_level(self):
+    def get_study_levels(self):
+        model = LinearModel(0.5, 0.5, 0.5)
+        target_model = LinearModel(0.2, 0.1, -0.5)
+        points = [(1, 2), (-2, 0)]
+        yield StudyPlaneLevel(model, self.get_points(target_model, points), ErrorType.SUM_LINEAR, 0.5, 1, 3)
         model = LinearModel(0.4, 0.4, 0.2)
-        target_model = LinearModel(0.3, 0.5, -0.4)
+        target_model = LinearModel(-0.3, -0.5, -0.4)
         points = [(-2, -2), (-2, 2), (2, -2), (2, 2)]
-        yield StudyPlaneLevel(model, self.get_points(target_model, points))
+        yield StudyPlaneLevel(model, self.get_points(target_model, points), ErrorType.SUM_LINEAR, 0.5, 2, 3)
+        model = LinearModel(0.0, 0.0, 0.0)
+        target_model = LinearModel(1.0, 0.5, -1.0)
+        points = [(1, 4), (5, 3), (4, -2), (-4, 6), (3, -2)]
+        yield StudyPlaneLevel(model, self.get_points(target_model, points), ErrorType.SUM_LINEAR, 2.0, 3, 3)
 
 class InfoLevel(Level):
     def __init__(self, header, image_file, audio_file, story = None):
-        super(InfoLevel, self).__init__(LevelType.INFO)
+        super().__init__(LevelType.INFO)
         self.header = header
         self.image = Images.load_image_file(image_file)
         self.audio_file = Sounds.get_file(audio_file)
@@ -65,7 +81,7 @@ class InfoLevel(Level):
 
 class SplitMonstersLevel(Level):
     def __init__(self, model, levels, colors, monsters, level_number, number_of_levels):
-        super(SplitMonstersLevel, self).__init__(LevelType.SPLIT_MONSTERS)
+        super().__init__(LevelType.SPLIT_MONSTERS, level_number, number_of_levels)
         self.model = model
         self.levels = levels
         self.colors = colors

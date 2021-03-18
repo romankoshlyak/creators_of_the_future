@@ -1,6 +1,6 @@
 import copy
 import numpy as np
-from ipywidgets import Image, Layout, Button, VBox, HBox, Label, Box, GridBox, HTML
+from ipywidgets import Image, Layout, Button, VBox, HBox, Label, Box, GridBox, HTML, HTMLMath
 from utils import WidgetsManager, Images, Sounds
 from levels import *
 from models import LinearModel, StudyLineModel
@@ -315,21 +315,44 @@ class StudyPlaneView(LevelView):
         self.level = level
         self.main_graph = StudyPlaneGraph(self)
         self.error = HTML('Error')
+        self.error_value = 1.0
         self.main_graph = StudyPlaneGraph(self)
         super().__init__(main_view)
 
     def set_error(self, errors, colors):
-        parts = [f'<span style="color:{color}">{error:.2f}</span>' for error, color in zip(errors, colors)]
-        error = 'Error ' + '+'.join(parts) + f'={sum(errors):.2f}'
+        if self.level.error_type == ErrorType.SUM_LINEAR:
+            error_name = "Sum linear error"
+            part_format = "|{}|"
+            all_format = "{}"
+            error = sum(np.abs(errors))
+        elif self.level.error_type == ErrorType.MEAN_LINEAR:
+            error_name = "Mean linear error"
+            part_format = "|{}|"
+            all_format = "({})/{}"
+            error = sum(np.abs(errors))/len(errors)
+        elif self.level.error_type == ErrorType.SUM_SQUARED:
+            error_name = "Sum squared error"
+            part_format = "({})^2"
+            all_format = "{}"
+            error = sum(np.square(errors))
+        elif self.level.error_type == ErrorType.MEAN_SQUARED:
+            error_name = "Mean squared error"
+            part_format = "({})^2"
+            all_format = "({})/{}"
+            error = sum(np.square(errors))/len(errors)
+
+        parts = [part_format.format(f'<span style="color:{color}">{error:.2f}</span>') for error, color in zip(errors, colors)]
+        self.error_value = error
+        error = f'{error_name} ' + all_format.format('+'.join(parts), len(parts))  + f'={error:.2f} Limit={self.level.error_limit:.2f}'
         self.error.value = error
 
     def get_level_status(self):
-        items = self.index_grid_items([HTML('<h1>Prepare yourself for the next night</h1>'), HTML(f'Level 1/10'), self.error])
+        items = self.index_grid_items([HTML('<h1>Prepare yourself for the next night</h1>'), HTML(f'Level {self.level.level_number}/{self.level.number_of_levels}'), self.error])
         return GridBox(
             children=items,
             layout=Layout(
                 grid_template_rows='repeat(2, max-content)',
-                grid_template_columns='50% 50%',
+                grid_template_columns='20% 80%',
                 grid_template_areas='''
                 "item0 item0"
                 "item1 item2"
@@ -378,6 +401,7 @@ class StudyPlaneView(LevelView):
         self.widgets_manager.disable_widgets()
         self.main_graph.rerender()
         self.widgets_manager.enable_widgets()
+        self.next_level_button.disabled = bool(self.error_value > self.level.error_limit)
 
     def render(self):
         return self.get_main_view([self.get_level_status(), self.get_level_controls(), self.main_graph.graph, self.get_controls()])
@@ -411,7 +435,9 @@ class MainView(object):
         yield from self.second_level()
 
     def second_level(self):
-        yield from StudyPlaneLevelFactory().get_test_level()
+        yield InfoLevel("Let me prepare myself for next night", "./images/wake_up.jpg", None, "It was easy after preparation, let's prepare today too")
+        yield from StudyPlaneLevelFactory().get_study_levels()
+        yield InfoLevel("Congratulations", "./images/dream.jpg", "congratulations", "Congratulations! You earned your place among creators of the future. Now, you are ready to know what means to be a creator. By playing this game you actually studied machine learning. Join our secret group to continue your education and access to the next chapter of the game. Creators of the future are waiting for you https://www.facebook.com/groups/458107258671703").set_hide_next_button(True)
 
     def first_level(self):
         yield from self.intro_levels()
@@ -443,7 +469,7 @@ class MainView(object):
         yield InfoLevel("Last night was crazy", "./images/sleep.jpg", "last_night", "Last night was crazy. I can not believe I spent half of the day in the training. What a silly move from my side! Time to go into the darkness and get some rest ...")
         yield InfoLevel("You are back", "./images/dream.jpg", "you_are_back", "You are back, we were waiting for you! Don't panic, you can win now. I know that you are not a real creator yet and you are scared, but I believe in you. Go and bring us a victory this time!")
         yield from SplitMonstersLevelsFactory().get_main_levels()
-        yield InfoLevel("Congratulations", "./images/dream.jpg", "congratulations", "Congratulations! You earned your place among creators of the future. Now, you are ready to know what means to be a creator. By playing this game you actually studied machine learning. Join our secret group to continue your education and access to the next chapter of the game. Creators of the future are waiting for you https://www.facebook.com/groups/458107258671703").set_hide_next_button(True)
+        yield InfoLevel("Congratulations", "./images/dream.jpg", "congratulations", "Congratulations! You earned your place among creators of the future. Now, you are ready to know what means to be a creator. By playing this game you actually studied machine learning. Join our secret group to continue your education and access to the next chapter of the game. Creators of the future are waiting for you https://www.facebook.com/groups/458107258671703")
 
     def get_view_for_level(self, level):
         if level.level_type == LevelType.STUDY_LINE:

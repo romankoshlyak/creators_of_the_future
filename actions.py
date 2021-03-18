@@ -33,8 +33,7 @@ class ChangeWeightAction(ButtonAction):
 
     def do_action(self, *args):
         self.tensor.view(-1)[self.index] += self.mult * 0.1
-        if self.audio_file is not None:
-            Sounds.play_audio(self.audio_file)
+        Sounds.play_audio(self.audio_file)
         self.view.update_model()
 
 class ChooseDimensionAction(ButtonAction):

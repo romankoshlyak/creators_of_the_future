@@ -195,8 +195,10 @@ class StudyPlaneGraph(BaseGraph):
             output = self.model(data)
         return output.view(-1).numpy()
 
-    def get_color(self, x):
-        return self.color_cmap(self.color_coef*x+self.color_base)
+    def get_color(self, x, norm=True):
+        if norm:
+            x = self.color_coef*x+self.color_base
+        return self.color_cmap(x)
 
     def setup_color(self):
         target = [point.target for point in self.view.level.points]
@@ -206,15 +208,15 @@ class StudyPlaneGraph(BaseGraph):
         self.color_base = 0.1-min_target*self.color_coef
         self.color_cmap = plt.cm.get_cmap('viridis')
         
-        target = sorted(target)
+        target = sorted(list(set(target)))
+        level_size = (target[-1]-target[0])/(len(target)-1)
         self.plot_target = target
-        cols = list(map(self.get_color, target))
+        cols = [self.get_color(0.0, False)] + list(map(self.get_color, target)) + [self.get_color(1.0, False)]
         self.plot_levels = [(x+y)/2.0 for x, y in zip(target, target[1:])]
-        levels = [-100.0] + self.plot_levels + [100]
-        self.plot_levels = levels
+        self.plot_levels = [self.plot_levels[0]-level_size-100, self.plot_levels[0]-level_size] + self.plot_levels + [self.plot_levels[-1]+level_size, self.plot_levels[-1]+level_size+100]
         self.plot_cmap = colors.ListedColormap(cols)
-        assert(len(levels)-1==self.plot_cmap.N)
-        self.plot_norm = colors.BoundaryNorm(levels, self.plot_cmap.N)
+        assert(len(self.plot_levels)-1==self.plot_cmap.N)
+        self.plot_norm = colors.BoundaryNorm(self.plot_levels, self.plot_cmap.N)
 
     def render(self, a):
         self.setup_color()
@@ -280,7 +282,7 @@ class StudyPlaneGraph(BaseGraph):
                 ax.scatter(point.x, max_y, point.target, c='red')
 
             if self.options.show_error:
-                ax.text(point.x, max_y, point.target, f'{abs(z[i]-point.target):.2f}', 'x', c='red')
+                ax.text(point.x, max_y, point.target, f'{(z[i]-point.target):.2f}', 'x', c='red')
 
             if self.options.show_x_projection:
                 ax.scatter(min_x, point.y, z[i], color=color)
@@ -296,6 +298,6 @@ class StudyPlaneGraph(BaseGraph):
 
         plt.show()
 
-        errors = [abs(z[i]-point.target) for i, point in enumerate(self.view.level.points)]
+        errors = [z[i]-point.target for i, point in enumerate(self.view.level.points)]
         cols = [colors.to_hex(self.get_color(point.target)) for point in self.view.level.points]
         self.view.set_error(errors, cols)
