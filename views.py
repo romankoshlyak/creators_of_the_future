@@ -2,10 +2,9 @@ import copy
 import numpy as np
 from ipywidgets import Image, Layout, Button, VBox, HBox, Label, Box, GridBox, HTML
 from utils import WidgetsManager, Images, Sounds
-from levels import InfoLevel, StudyLineLevel, SplitMonstersLevelsFactory
+from levels import *
 from models import LinearModel, StudyLineModel
-from graphs import StudyLineGraph, BarGraph, MonsterGraph
-from levels import LevelType
+from graphs import StudyLineGraph, BarGraph, MonsterGraph, StudyPlaneGraph
 from actions import ChangeWeightAction, NextLevelAction, RestartLevelAction
 
 class LevelView(object):
@@ -147,8 +146,6 @@ class StudyLineLevelView(LevelView):
         self.xgrid = (-3.0, 3.0)
         self.ygrid = (-3.0, 3.0)
         self.level = level
-        self.widgets_manager = WidgetsManager()
-        self.finished = False
         self.graph = StudyLineGraph(self)
 
     def get_controls_items(self):
@@ -312,6 +309,79 @@ class StudyLineLevelView(LevelView):
     def render(self):
         return self.get_main_view([self.get_game_status(), self.get_level_controls(), self.graph.graph, self.get_controls()])
 
+class StudyPlaneView(LevelView):
+    PARAM_NAMES = ['Weight 0', 'Weight 1', 'Bias']
+    def __init__(self, level, main_view):
+        self.level = level
+        self.main_graph = StudyPlaneGraph(self)
+        self.error = HTML('Error')
+        self.main_graph = StudyPlaneGraph(self)
+        super().__init__(main_view)
+
+    def set_error(self, errors, colors):
+        parts = [f'<span style="color:{color}">{error:.2f}</span>' for error, color in zip(errors, colors)]
+        error = 'Error ' + '+'.join(parts) + f'={sum(errors):.2f}'
+        self.error.value = error
+
+    def get_level_status(self):
+        items = self.index_grid_items([HTML('<h1>Prepare yourself for the next night</h1>'), HTML(f'Level 1/10'), self.error])
+        return GridBox(
+            children=items,
+            layout=Layout(
+                grid_template_rows='repeat(2, max-content)',
+                grid_template_columns='50% 50%',
+                grid_template_areas='''
+                "item0 item0"
+                "item1 item2"
+                ''')
+       )
+
+    def get_controls_items(self, disabled_buttons = []):
+        model = self.level.model
+        param_index = 0
+        items = [Label('Weights')]
+        buttons = []
+        for param in model.named_parameters():
+            tensor = param[1].data
+            for i in range(len(tensor.view(-1))):
+                param_name = self.PARAM_NAMES[param_index]
+                param_index += 1
+                items.append(Label(param_name))
+                button = self.create_button('Add', ChangeWeightAction(1.0, tensor, i, self))
+                buttons.append(button)
+                items.append(button)
+                button = self.create_button('Sub', ChangeWeightAction(-1.0, tensor, i, self))
+                buttons.append(button)
+                items.append(button)
+                
+        self.buttons = buttons
+        #self.disable_buttons(self.buttons, disabled_buttons)
+        items = self.index_grid_items(items)
+        return items
+
+    def get_controls(self):
+        items = self.get_controls_items()
+        return GridBox(
+            children=items,
+            layout=Layout(
+                grid_template_rows='repeat(4, max-content)',
+                grid_template_columns='max-content auto auto',
+                grid_template_areas='''
+                "item0 item0 item0"
+                "item1 item2 item3"
+                "item4 item5 item6"
+                "item7 item8 item9"
+                ''')
+       )
+
+    def update_model(self):
+        self.widgets_manager.disable_widgets()
+        self.main_graph.rerender()
+        self.widgets_manager.enable_widgets()
+
+    def render(self):
+        return self.get_main_view([self.get_level_status(), self.get_level_controls(), self.main_graph.graph, self.get_controls()])
+
 class InfoLevelView(LevelView):
     def __init__(self, level, main_view):
         super(InfoLevelView, self).__init__(main_view)
@@ -332,11 +402,18 @@ class InfoLevelView(LevelView):
 
 class MainView(object):
     def __init__(self):
-        self.levels = list(self.all_levels())
+        self.levels = list(self.second_level())
         self.main_box = VBox(children=[])
         self.load_current_level(0)
 
     def all_levels(self):
+        yield from self.first_level()
+        yield from self.second_level()
+
+    def second_level(self):
+        yield from StudyPlaneLevelFactory().get_test_level()
+
+    def first_level(self):
         yield from self.intro_levels()
         yield from self.study_line_levels()
         yield from self.monster_levels()
@@ -375,6 +452,8 @@ class MainView(object):
             return InfoLevelView(level, self)
         elif level.level_type == LevelType.SPLIT_MONSTERS:
             return MonsterLevelView(level, self)
+        elif level.level_type == LevelType.STUDY_PLANE:
+            return StudyPlaneView(level, self)
 
     def do_next_level(self):
         self.load_current_level(self.current_level_index+1)

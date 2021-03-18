@@ -1,3 +1,5 @@
+import torch
+
 from enum import Enum
 from utils import Images, Sounds
 from models import LinearModel
@@ -6,6 +8,7 @@ class LevelType(Enum):
     STUDY_LINE = 1
     INFO = 2
     SPLIT_MONSTERS = 3
+    STUDY_PLANE = 4
 
 class Level(object):
     def __init__(self, level_type):
@@ -19,6 +22,33 @@ class StudyLineLevel(Level):
         self.disabled_buttons = disabled_buttons
         self.level_number = level_number
         self.number_of_levels = number_of_levels
+
+class StudyPlaneLevel(Level):
+    def __init__(self, model, points):
+        super(StudyPlaneLevel, self).__init__(LevelType.STUDY_PLANE)
+        self.model = model
+        self.points = points
+
+class PointInfo(object):
+    def __init__(self, x, y, target):
+        self.x = x
+        self.y = y
+        self.target = target
+
+class StudyPlaneLevelFactory(object):
+    def get_tensor(self, points):
+        return torch.tensor(points, dtype=torch.float)
+
+    def get_points(self, target_model, points):
+        output = target_model(self.get_tensor(points)).view(-1).tolist()
+        return [PointInfo(x, y, z) for (x, y), z in zip(points, output)]
+
+
+    def get_test_level(self):
+        model = LinearModel(0.4, 0.4, 0.2)
+        target_model = LinearModel(0.3, 0.5, -0.4)
+        points = [(-2, -2), (-2, 2), (2, -2), (2, 2)]
+        yield StudyPlaneLevel(model, self.get_points(target_model, points))
 
 class InfoLevel(Level):
     def __init__(self, header, image_file, audio_file, story = None):
