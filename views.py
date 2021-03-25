@@ -3,6 +3,7 @@ import numpy as np
 from ipywidgets import Image, Layout, Button, VBox, HBox, Label, Box, GridBox, HTML, HTMLMath
 from utils import WidgetsManager, Images, Sounds
 from levels import *
+from level_factories import *
 from models import LinearModel, StudyLineModel
 from graphs import StudyLineGraph, BarGraph, MonsterGraph, StudyPlaneGraph
 from actions import ChangeWeightAction, NextLevelAction, RestartLevelAction
@@ -67,24 +68,58 @@ class LevelView(object):
                 ''')
        )
 
+    def __button_name_to_audio_file(self, button_name):
+        sound_name = '_'.join(button_name.lower().split())
+        return Sounds.get_file(sound_name)
+        
+    def get_magic_controls(self, model):
+        all_parameter_controls = []
+        all_parameter_controls.append(Label('Spells:'))
+        param_index = 0
+        buttons = []
+        for param in model.named_parameters():
+            tensor = param[1].data
+            for i in range(len(tensor.view(-1))):
+                param_name = self.PARAM_NAMES[param_index]
+                param_index += 1
+                button_name_add = f'{param_name} Adinimus'
+                button_name_sub = f'{param_name} Subinimus'
+                add_spell = self.__button_name_to_audio_file(button_name_add)
+                sub_spell = self.__button_name_to_audio_file(button_name_sub)
+                buttons.append(self.create_button(button_name_add, ChangeWeightAction(1.0, tensor, i, self).set_audio_file(add_spell)))
+                buttons.append(self.create_button(button_name_sub, ChangeWeightAction(-1.0, tensor, i, self).set_audio_file(sub_spell)))
+                
+        all_parameter_controls.append(GridBox(children=buttons, layout=Layout(grid_template_columns='auto auto')))
+        return VBox(children=all_parameter_controls)
+
 class StatusObject(object):
-    def __init__(self, file_name, x_offset, text_format, value, min_value = 0.0, max_value = 1.0):
+    def __init__(self, file_name, text_format, value, min_value = 0.0, max_value = 1.0):
+        self.x_offset = 0.0
         self.img = Images.load_image(file_name)
-        self.x_offset = x_offset
         self.text_format = text_format
         self.value = value
         self.min_value = min_value
         self.max_value = max_value
+
+    def set_x_offset(self, x_offset):
+        self.x_offset = x_offset
+
+    def get_expected_length(self):
+        return 1.0 + len(self.text_format.split("\\"))/10.0
 
 class MonsterLevelView(LevelView):
     PARAM_NAMES = ['Witos Seros', 'Witos Unos', 'Bias']
     def __init__(self, level, main_view):
         super(MonsterLevelView, self).__init__(main_view)
         self.level = level
-        self.accuracy = StatusObject(Images.ACCURACY_MONSTER, 0.5, "Acurasimus\n {0:.2f}/{1}", 0.0)
-        self.iteration = StatusObject(Images.ITERATION_MONSTER, 3.5, "Iterasimus\n {0}/{1}", 0, 0, self.level.max_iterations)
-        self.level_status = StatusObject(Images.LEVEL_MONSTER, 6.0, "Level\n {0}/{1}", self.level.level_number, 0, self.level.number_of_levels)
-        self.bar_graph = BarGraph([self.accuracy, self.iteration, self.level_status])
+        self.error = StatusObject(Images.ERROR_MONSTER, "Erorisimus\n {0:.2f}/{1}", 0.0)
+        self.accuracy = StatusObject(Images.ACCURACY_MONSTER, "Acurasimus\n {0:.2f}/{1}", 0.0)
+        self.iteration = StatusObject(Images.ITERATION_MONSTER, "Iterasimus\n {0}/{1}", 0, 0, self.level.max_iterations)
+        self.level_status = StatusObject(Images.LEVEL_MONSTER, "Level\n {0}/{1}", self.level.level_number, 0, self.level.number_of_levels)
+        stats = [self.accuracy, self.iteration, self.level_status]
+        if (self.level.level_type == LevelType.MULTI_SPLIT_MONSTERS):
+            stats = [self.error] + stats
+        self.bar_graph = BarGraph(stats)
         self.monster_min_size = 3.0
         self.monster_max_size = 10.0
         self.main_graph = MonsterGraph(self.level.model, self)
@@ -100,7 +135,7 @@ class MonsterLevelView(LevelView):
         self.widgets_manager.disable_widgets()
         if self.iteration.value < self.level.max_iterations:
             self.iteration.value += 1
-        self.main_graph.rerender()
+            self.main_graph.rerender()
         if self.iteration.value < self.level.max_iterations:
             self.widgets_manager.enable_widgets()
         self.next_level_button.disabled = self.accuracy.value < 1.0-1e-7
@@ -110,34 +145,12 @@ class MonsterLevelView(LevelView):
 
         self.bar_graph.rerender()
 
-    def button_name_to_audio_file(self, button_name):
-        sound_name = '_'.join(button_name.lower().split())
-        return Sounds.get_file(sound_name)
-        
-    def get_controls(self, graph):
-        model = graph.model
-        all_parameter_controls = []
-        all_parameter_controls.append(Label('Spells:'))
-        param_index = 0
-        buttons = []
-        for param in model.named_parameters():
-            tensor = param[1].data
-            for i in range(len(tensor.view(-1))):
-                param_name = self.PARAM_NAMES[param_index]
-                param_index += 1
-                button_name_add = f'{param_name} Adinimus'
-                button_name_sub = f'{param_name} Subinimus'
-                add_spell = self.button_name_to_audio_file(button_name_add)
-                sub_spell = self.button_name_to_audio_file(button_name_sub)
-                buttons.append(self.create_button(button_name_add, ChangeWeightAction(1.0, tensor, i, self).set_audio_file(add_spell)))
-                buttons.append(self.create_button(button_name_sub, ChangeWeightAction(-1.0, tensor, i, self).set_audio_file(sub_spell)))
-                
-        all_parameter_controls.append(GridBox(children=buttons, layout=Layout(grid_template_columns='auto auto')))
-        return VBox(children=all_parameter_controls)
-
     def render(self):
         show_restart_button = not self.level.hide_restart_button
-        return self.get_main_view([self.bar_graph.graph, self.get_level_controls(show_restart_button), self.main_graph.graph, self.get_controls(self.main_graph)])
+        return self.get_main_view([self.bar_graph.graph, self.get_level_controls(show_restart_button), self.main_graph.graph, self.get_magic_controls(self.main_graph.model)])
+
+class MultiSplitMonsterLevelView(MonsterLevelView):
+    pass
 
 class StudyLineLevelView(LevelView):
     PARAM_NAMES = ['Weight 0', 'Weight 1', 'Bias']
@@ -435,9 +448,10 @@ class MainView(object):
         yield from self.second_level()
 
     def second_level(self):
-        yield InfoLevel("Let me prepare myself for next night", "./images/wake_up.jpg", None, "It was easy after preparation, let's prepare today too")
-        yield from StudyPlaneLevelFactory().get_study_levels()
-        yield InfoLevel("Congratulations", "./images/dream.jpg", "congratulations", "Congratulations! You earned your place among creators of the future. Now, you are ready to know what means to be a creator. By playing this game you actually studied machine learning. Join our secret group to continue your education and access to the next chapter of the game. Creators of the future are waiting for you https://www.facebook.com/groups/458107258671703").set_hide_next_button(True)
+        yield from SplitMonstersLevelsFactory().get_multi_split_levels()
+        #yield InfoLevel("Let me prepare myself for next night", "./images/wake_up.jpg", None, "It was easy after preparation, let's prepare today too")
+        #yield from StudyPlaneLevelFactory().get_study_levels()
+        #yield InfoLevel("Congratulations", "./images/dream.jpg", "congratulations", "Congratulations! You earned your place among creators of the future. Now, you are ready to know what means to be a creator. By playing this game you actually studied machine learning. Join our secret group to continue your education and access to the next chapter of the game. Creators of the future are waiting for you https://www.facebook.com/groups/458107258671703").set_hide_next_button(True)
 
     def first_level(self):
         yield from self.intro_levels()
@@ -480,6 +494,8 @@ class MainView(object):
             return MonsterLevelView(level, self)
         elif level.level_type == LevelType.STUDY_PLANE:
             return StudyPlaneView(level, self)
+        elif level.level_type == LevelType.MULTI_SPLIT_MONSTERS:
+            return MultiSplitMonsterLevelView(level, self)
 
     def do_next_level(self):
         self.load_current_level(self.current_level_index+1)

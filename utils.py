@@ -23,6 +23,7 @@ class Assets(object):
 
 class Images(Assets):
     IMAGES_DIR = os.path.join(Assets.DREAM_DIR, 'images')
+    ERROR_MONSTER = os.path.join(IMAGES_DIR, 'apoke.15_00000.png')
     ACCURACY_MONSTER = os.path.join(IMAGES_DIR, 'apoke.04_00067.png')
     ITERATION_MONSTER = os.path.join(IMAGES_DIR, 'apoke.16_00040.png')
     LEVEL_MONSTER = os.path.join(IMAGES_DIR, 'apoke.22_00039.png')
@@ -53,4 +54,4 @@ class Sounds(Assets):
         if file_name is not None:
             data = open(file_name, "rb").read()
             audio64 = base64.b64encode(data).decode('ascii')
-            output.eval_js(f'new Audio("data:audio/wav;base64,{audio64}").play()')
+            #output.eval_js(f'new Audio("data:audio/wav;base64,{audio64}").play()')

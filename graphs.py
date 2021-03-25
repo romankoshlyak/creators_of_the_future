@@ -13,10 +13,59 @@ class BaseGraph(object):
     def rerender(self):
         self.graph_update.value = self.graph_update.value + 1
 
+    def get_color(self, x, norm=True):
+        if norm:
+            x = self.plot_norm(x)
+        return self.plot_cmap(x)
+
+    def __get_colors(self, target):
+        limit = max(abs(target[0]), abs(target[-1]))
+        color_coef = 0.8/(2*limit)
+        color_base = 0.1+limit*color_coef
+        target = [color_coef * t + color_base for t in target]
+        target = [0.0] + target + [1.0]
+        color_cmap = plt.cm.get_cmap('viridis')
+        return list(map(color_cmap, target))
+
+    def __get_range(self, limit, step_size):
+        target = []
+        ind = -limit-step_size
+        end_limit = limit+step_size+step_size*0.5
+        while ind < end_limit:
+            target.append(ind)
+            ind += step_size
+        return target
+
+    def setup_color(self):
+        level = self.view.level
+        target = sorted(list(set([point.target for point in level.points])))
+        limit = max(max(target), -min(target))
+
+        target = self.__get_range(limit, level.step_size)
+        cols = self.__get_colors(target[1:-1])
+        levels = [(x+y)/2.0 for x, y in zip(target, target[1:])]
+        levels = [levels[0]-1000.0] + levels + [levels[-1]+1000.0]
+        self.plot_cmap = colors.ListedColormap(cols)
+        assert(len(levels)-1==self.plot_cmap.N)
+        self.plot_norm = colors.BoundaryNorm(levels, self.plot_cmap.N)
+        self.plot_levels = levels
+
 class BarGraph(BaseGraph):
     def __init__(self, statuses):
         self.statuses = statuses
+        self.set_statuses_offset()
         super().__init__()
+
+    def set_statuses_offset(self):
+        size_sum = sum([status.get_expected_length() for status in self.statuses])
+        total = 8.0
+        offset = 0.5
+        total_spaces = total-2*offset-size_sum
+        each_space = total_spaces / (len(self.statuses)-1)
+        x_offset = offset
+        for status in self.statuses:
+            status.set_x_offset(x_offset)
+            x_offset += status.get_expected_length() + each_space
 
     def render(self, a):
         fig = plt.figure(figsize=(8, 1), frameon=False)
@@ -24,6 +73,7 @@ class BarGraph(BaseGraph):
         ax.set_xlim([0, 8])
         ax.set_ylim([0, 1])
         plt.axis('off')
+
         for status in self.statuses:
             ax.imshow(status.img, extent=[status.x_offset, status.x_offset+1, 0, 1], zorder=1)
             y_offset = (status.value-status.min_value)/(status.max_value-status.min_value)
@@ -58,14 +108,13 @@ class MonsterGraph(BaseGraph):
             output = self.model(data)
         return output.view(-1).numpy()
 
-    def draw_point(self, ax, monster, output_level, colors):
-        m_size = self.view.calc_monster_size()
+    def draw_point(self, ax, monster, output_level, target_level):
+        m_size = self.view.calc_monster_size()*2
         x = monster.x
         y = monster.y
-        target_level = monster.target_level
-        match_color = 'green' if monster.target_level == output_level else 'red'
-        target_circle = plt.Circle((x, y), 0.03*m_size, color=colors[target_level], zorder=2)
-        output_circle = plt.Circle((x, y), 0.04*m_size, color=colors[output_level], zorder=2)
+        match_color = 'green' if target_level == output_level else 'red'
+        target_circle = plt.Circle((x, y), 0.03*m_size, color=self.get_color(target_level, False), zorder=2)
+        output_circle = plt.Circle((x, y), 0.04*m_size, color=self.get_color(output_level, False), zorder=2)
         correct_circle = plt.Circle((x, y), 0.05*m_size, color=match_color, zorder=2)
         ax.add_patch(correct_circle)
         ax.add_patch(output_circle)
@@ -73,13 +122,12 @@ class MonsterGraph(BaseGraph):
         ax.imshow(monster.image, extent=[x-0.05*m_size, x+0.05*m_size, y-0.05*m_size, y+0.05*m_size], zorder=2)
 
     def render(self, a):
-        x = np.array([monster.x for monster in self.view.level.monsters])
-        y = np.array([monster.y for monster in self.view.level.monsters])
+        self.setup_color()
+        x = np.array([monster.x for monster in self.view.level.points])
+        y = np.array([monster.y for monster in self.view.level.points])
         output = self.model_prediction(x, y)
-        min_x = -3.0
-        max_x = 3.0
-        min_y = -3.0
-        max_y = 3.0
+        min_x, max_x = -3.0, 3.0
+        min_y, max_y = -3.0, 3.0
         xgrid = (min_x, max_x, 0.1)
         ygrid = (min_y, max_y, 0.1)
         X, Y = np.meshgrid(self.np_points(xgrid), self.np_points(ygrid))
@@ -92,26 +140,21 @@ class MonsterGraph(BaseGraph):
         ax.set_xlim([min_x, max_x])
         ax.set_ylim([min_y, max_y])
 
-        level = self.view.level
-        levels = level.levels
-        cmap = colors.ListedColormap(level.colors)
-        # the nuber of intervals must be equal to the number of listed colors
-        assert(len(levels)-1==cmap.N)
-        # the norm that we use to map values to colors, see the docs
-        norm = colors.BoundaryNorm(levels, cmap.N)
-        ax.contourf(X, Y, Z, cmap=cmap, levels=levels, norm=norm)
+        ax.contourf(X, Y, Z, cmap=self.plot_cmap, norm=self.plot_norm, levels=self.plot_levels, alpha=1.0)
+
         good = 0
         total = 0
-        output_levels = norm(output)
-        for index, monster in enumerate(level.monsters):
-            target_level = monster.target_level
+        output_levels = self.plot_norm(output)
+        level = self.view.level
+        for index, point in enumerate(level.points):
+            target_level = self.plot_norm(point.target)
             output_level = output_levels[index]
             good += 1 if target_level == output_level else 0
             total += 1
-            self.draw_point(ax, monster, output_level, level.colors)
-        self.view.update_status(good/total)
-
+            self.draw_point(ax, point, output_level, target_level)
         plt.show()
+
+        self.view.update_status(good/total)
 
 class StudyLineGraph(object):
     def __init__(self, view):
@@ -195,39 +238,14 @@ class StudyPlaneGraph(BaseGraph):
             output = self.model(data)
         return output.view(-1).numpy()
 
-    def get_color(self, x, norm=True):
-        if norm:
-            x = self.color_coef*x+self.color_base
-        return self.color_cmap(x)
-
-    def setup_color(self):
-        target = [point.target for point in self.view.level.points]
-        min_target = min(target)
-        max_target = max(target)
-        self.color_coef = 0.8/(max_target-min_target)
-        self.color_base = 0.1-min_target*self.color_coef
-        self.color_cmap = plt.cm.get_cmap('viridis')
-        
-        target = sorted(list(set(target)))
-        level_size = (target[-1]-target[0])/(len(target)-1)
-        self.plot_target = target
-        cols = [self.get_color(0.0, False)] + list(map(self.get_color, target)) + [self.get_color(1.0, False)]
-        self.plot_levels = [(x+y)/2.0 for x, y in zip(target, target[1:])]
-        self.plot_levels = [self.plot_levels[0]-level_size-100, self.plot_levels[0]-level_size] + self.plot_levels + [self.plot_levels[-1]+level_size, self.plot_levels[-1]+level_size+100]
-        self.plot_cmap = colors.ListedColormap(cols)
-        assert(len(self.plot_levels)-1==self.plot_cmap.N)
-        self.plot_norm = colors.BoundaryNorm(self.plot_levels, self.plot_cmap.N)
-
     def render(self, a):
         self.setup_color()
         data = self.get_model_data()
         x = data[:, 0]
         y = data[:, 1]
         z = self.model_prediction(x, y)
-        min_x = math.floor(torch.min(x).item()-1.0)
-        max_x = math.ceil(torch.max(x).item()+1.0)
-        min_y = math.floor(torch.min(y).item()-1.0)
-        max_y = math.ceil(torch.max(y).item()+1.0)
+        min_x, max_x = -3.0, 3.0
+        min_y, max_y = -3.0, 3.0
         xgrid = (min_x, max_x, 0.1)
         ygrid = (min_y, max_y, 0.1)
         X, Y = np.meshgrid(self.np_points(xgrid), self.np_points(ygrid))
