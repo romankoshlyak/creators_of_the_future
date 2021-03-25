@@ -100,6 +100,7 @@ class StatusObject(object):
         self.value = value
         self.min_value = min_value
         self.max_value = max_value
+        self.reverse = False
 
     def set_x_offset(self, x_offset):
         self.x_offset = x_offset
@@ -107,27 +108,36 @@ class StatusObject(object):
     def get_expected_length(self):
         return 1.0 + len(self.text_format.split("\\"))/10.0
 
+    def set_reverse(self, reverse):
+        self.reverse = reverse
+        return self
+
+    def set_max_value(self, max_value):
+        self.max_value = max_value
+
 class MonsterLevelView(LevelView):
     PARAM_NAMES = ['Witos Seros', 'Witos Unos', 'Bias']
     def __init__(self, level, main_view):
         super(MonsterLevelView, self).__init__(main_view)
         self.level = level
-        self.error = StatusObject(Images.ERROR_MONSTER, "Erorisimus\n {0:.2f}/{1}", 0.0)
-        self.accuracy = StatusObject(Images.ACCURACY_MONSTER, "Acurasimus\n {0:.2f}/{1}", 0.0)
-        self.iteration = StatusObject(Images.ITERATION_MONSTER, "Iterasimus\n {0}/{1}", 0, 0, self.level.max_iterations)
+        self.error = StatusObject(Images.ERROR_MONSTER, "Erorisimus\n {0:.2f}/{1:.2f}", 0.0).set_reverse(True)
+        self.accuracy = StatusObject(Images.ACCURACY_MONSTER, "Acurasimus\n {0:.2f}/{1:.2f}", 0.0)
+        self.iteration = StatusObject(Images.ITERATION_MONSTER, "Iterasimus\n {0}/{1:.2f}", 0, 0, self.level.max_iterations)
         self.level_status = StatusObject(Images.LEVEL_MONSTER, "Level\n {0}/{1}", self.level.level_number, 0, self.level.number_of_levels)
         stats = [self.accuracy, self.iteration, self.level_status]
         if (self.level.level_type == LevelType.MULTI_SPLIT_MONSTERS):
             stats = [self.error] + stats
         self.bar_graph = BarGraph(stats)
-        self.monster_min_size = 3.0
+        self.monster_min_size = 6.0
         self.monster_max_size = 10.0
-        self.main_graph = MonsterGraph(self.level.model, self)
+        self.main_graph = MonsterGraph(self)
 
     def calc_monster_size(self):
         return (self.monster_max_size-self.monster_min_size)*(self.iteration.value)/float(self.level.max_iterations)+self.monster_min_size
 
-    def update_status(self, accuracy):
+    def update_status(self, error, accuracy):
+        self.error.value = error
+        self.error.set_max_value(max(self.error.max_value, error))
         self.accuracy.value = accuracy
         self.bar_graph.rerender()
 
@@ -448,10 +458,11 @@ class MainView(object):
         yield from self.second_level()
 
     def second_level(self):
-        #yield from SplitMonstersLevelsFactory().get_multi_split_levels()
-        #yield InfoLevel("Let me prepare myself for next night", "./images/wake_up.jpg", None, "It was easy after preparation, let's prepare today too")
+        yield InfoLevel("Let me prepare myself for next night", "./images/wake_up.jpg", None, "It was easy after preparation, let's prepare today too")
         yield from StudyPlaneLevelFactory().get_study_levels()
-        #yield InfoLevel("Congratulations", "./images/dream.jpg", "congratulations", "Congratulations! You earned your place among creators of the future. Now, you are ready to know what means to be a creator. By playing this game you actually studied machine learning. Join our secret group to continue your education and access to the next chapter of the game. Creators of the future are waiting for you https://www.facebook.com/groups/458107258671703").set_hide_next_button(True)
+        yield InfoLevel("You are back", "./images/dream.jpg", None, "Warning, <b>Iterasimums</b> learned a new hide spell and he can hide battle field from you, but <b>Acurasimus</b> bring his friend <b>Erorisimus</b> to help out in such situation")
+        yield from SplitMonstersLevelsFactory().get_multi_split_levels()
+        yield InfoLevel("Congratulations", "./images/dream.jpg", None, "Congratulations! You once again show your potential, the way you handlered hide spell was impressive").set_hide_next_button(True)
 
     def first_level(self):
         yield from self.intro_levels()

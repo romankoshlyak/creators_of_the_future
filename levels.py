@@ -71,6 +71,7 @@ class BaseMonsterLevel(Level):
         self.step_size = 1.0
         self.max_iterations = 10
         self.hide_restart_button = False
+        self.hide_spell = False
 
     def set_max_iterations(self, max_iterations):
         self.max_iterations = max_iterations
@@ -80,12 +81,17 @@ class BaseMonsterLevel(Level):
         self.hide_restart_button = hide_restart_button
         return self
 
+    def set_hide_spell(self, hide_spell):
+        self.hide_spell = hide_spell
+        return self
+
 class SplitMonstersLevel(BaseMonsterLevel):
     def __init__(self, model, points, level_number, number_of_levels):
         super().__init__(LevelType.SPLIT_MONSTERS, model, points, level_number, number_of_levels)
 
 class MultiSplitMonstersLevel(BaseMonsterLevel):
-    def __init__(self, model, points, error_type, error_limit, level_number, number_of_levels):
+    def __init__(self, model, points, step_size, error_type, error_limit, level_number, number_of_levels):
         super().__init__(LevelType.MULTI_SPLIT_MONSTERS, model, points, level_number, number_of_levels)
+        self.step_size = step_size
         self.error_type = error_type
         self.error_limit = error_limit

@@ -14,10 +14,19 @@ class BaseGraph(object):
     def rerender(self):
         self.graph_update.value = self.graph_update.value + 1
 
-    def get_color(self, x, norm=True):
-        if norm:
-            x = self.plot_norm(x)
-        return self.plot_cmap(x)
+
+class BaseMainGraph(BaseGraph):
+    def __init__(self, view):
+        self.view = view
+        self.model = view.level.model
+        self.min_x, self.max_x = -3.0, 3.0
+        self.min_y, self.max_y = -3.0, 3.0
+        self.step = 0.1
+        target = [point.target for point in self.view.level.points]
+        self.min_z = min(target)
+        self.max_z = max(target)
+        self.__setup_color()
+        super().__init__()
 
     def __get_colors(self, target):
         limit = max(abs(target[0]), abs(target[-1]))
@@ -37,7 +46,7 @@ class BaseGraph(object):
             ind += step_size
         return target
 
-    def setup_color(self):
+    def __setup_color(self):
         level = self.view.level
         self.plot_target = sorted(list(set([point.target for point in level.points])))
         limit = max(-self.plot_target[0], self.plot_target[1])
@@ -50,6 +59,38 @@ class BaseGraph(object):
         assert(len(levels)-1==self.plot_cmap.N)
         self.plot_norm = colors.BoundaryNorm(levels, self.plot_cmap.N)
         self.plot_levels = levels
+
+    def __np_points(self, grid):
+        eps = 1e-7
+        return np.arange(grid[0], grid[1]+eps, grid[2])
+
+    def __make_tensor(self, x):
+        if isinstance(x, np.ndarray):
+            x = torch.from_numpy(x).float()
+        return x
+
+    def get_color(self, x, norm=True):
+        if norm:
+            x = self.plot_norm(x)
+        return self.plot_cmap(x)
+
+    def model_prediction(self, X, Y):
+        X = self.__make_tensor(X)
+        Y = self.__make_tensor(Y)
+        data = torch.cat((X.view(-1, 1), Y.view(-1, 1)), dim = 1)
+        with torch.no_grad():
+            output = self.model(data)
+            return output.view_as(X).numpy()
+
+    def get_model_data(self):
+        data = torch.tensor([[point.x, point.y] for point in self.view.level.points], dtype=torch.float)
+        return data[:, 0], data[:, 1]
+
+    def get_meshgrid(self):
+        xgrid = (self.min_x, self.max_x, self.step)
+        ygrid = (self.min_y, self.max_y, self.step)
+        X, Y = np.meshgrid(self.__np_points(xgrid), self.__np_points(ygrid))
+        return X, Y
 
 class BarGraph(BaseGraph):
     def __init__(self, statuses):
@@ -78,84 +119,13 @@ class BarGraph(BaseGraph):
         for status in self.statuses:
             ax.imshow(status.img, extent=[status.x_offset, status.x_offset+1, 0, 1], zorder=1)
             y_offset = (status.value-status.min_value)/(status.max_value-status.min_value)
+            if status.reverse:
+                y_offset = 1.0-y_offset
             rect = plt.Rectangle((status.x_offset, y_offset), 1, (1.0-y_offset), color='white', alpha=0.8, zorder=2)
             ax.add_patch(rect)
             ax.text(status.x_offset+1, 0.5, status.text_format.format(status.value, status.max_value))
 
         plt.show()
-
-class MonsterGraph(BaseGraph):
-    def __init__(self, model, view):
-        self.model = model
-        self.view = view
-        super().__init__()
-        
-    def np_points(self, grid):
-        eps = 1e-7
-        return np.arange(grid[0], grid[1]+eps, grid[2])        
-
-    def model_prediction(self, X, Y):
-        XT = torch.from_numpy(X).float()
-        YT = torch.from_numpy(Y).float()
-        data = torch.cat((XT.view(-1, 1), YT.view(-1, 1)), dim = 1)
-        with torch.no_grad():
-            output = self.model(data)
-            return output.view_as(XT).numpy()
-
-    def get_model_output(self):
-        data = self.get_model_data()
-        data = torch.from_numpy(data).float()
-        with torch.no_grad():
-            output = self.model(data)
-        return output.view(-1).numpy()
-
-    def draw_point(self, ax, monster, output_level, target_level):
-        m_size = self.view.calc_monster_size()*2
-        x = monster.x
-        y = monster.y
-        match_color = 'green' if target_level == output_level else 'red'
-        target_circle = plt.Circle((x, y), 0.03*m_size, color=self.get_color(target_level, False), zorder=2)
-        output_circle = plt.Circle((x, y), 0.04*m_size, color=self.get_color(output_level, False), zorder=2)
-        correct_circle = plt.Circle((x, y), 0.05*m_size, color=match_color, zorder=2)
-        ax.add_patch(correct_circle)
-        ax.add_patch(output_circle)
-        ax.add_patch(target_circle)
-        ax.imshow(monster.image, extent=[x-0.05*m_size, x+0.05*m_size, y-0.05*m_size, y+0.05*m_size], zorder=2)
-
-    def render(self, a):
-        self.setup_color()
-        x = np.array([monster.x for monster in self.view.level.points])
-        y = np.array([monster.y for monster in self.view.level.points])
-        output = self.model_prediction(x, y)
-        min_x, max_x = -3.0, 3.0
-        min_y, max_y = -3.0, 3.0
-        xgrid = (min_x, max_x, 0.1)
-        ygrid = (min_y, max_y, 0.1)
-        X, Y = np.meshgrid(self.np_points(xgrid), self.np_points(ygrid))
-        Z = self.model_prediction(X, Y)        
-        min_z = math.floor(np.min(Z))
-        max_z = math.ceil(np.max(Z))
-        fig = plt.figure(figsize=(8, 8), frameon=False)
-        ax = fig.add_axes([0, 0, 1, 1])
-        plt.axis('off')
-        ax.set_xlim([min_x, max_x])
-        ax.set_ylim([min_y, max_y])
-
-        ax.contourf(X, Y, Z, cmap=self.plot_cmap, norm=self.plot_norm, levels=self.plot_levels, alpha=1.0)
-
-        good = 0
-        total = 0
-        output_levels = self.plot_norm(output)
-        level = self.view.level
-        for index, point in enumerate(level.points):
-            target_level = self.plot_norm(point.target)
-            output_level = output_levels[index]
-            good += 1 if target_level == output_level else 0
-            total += 1
-            self.draw_point(ax, point, output_level, target_level)
-        plt.show()
-
-        self.view.update_status(good/total)
 
 class StudyLineGraph(object):
     def __init__(self, view):
@@ -202,66 +172,12 @@ class StudyPlaneGraphOptions(object):
         self.show_surface = True
         self.show_surface_projection = True
 
-class StudyPlaneGraph(BaseGraph):
+class StudyPlaneGraph(BaseMainGraph):
     def __init__(self, view):
-        self.view = view
-        self.model = view.level.model
         self.options = StudyPlaneGraphOptions()
-        target = [point.target for point in self.view.level.points]
-        self.min_z = min(target)
-        self.max_z = max(target)
-        super().__init__()
+        super().__init__(view)
 
-    def np_points(self, grid):
-        eps = 1e-7
-        return np.arange(grid[0], grid[1]+eps, grid[2])
-
-    def make_tensor(self, x):
-        if isinstance(x, np.ndarray):
-            x = torch.from_numpy(x).float()
-        return x
-
-    def model_prediction(self, X, Y):
-        X = self.make_tensor(X)
-        Y = self.make_tensor(Y)
-        data = torch.cat((X.view(-1, 1), Y.view(-1, 1)), dim = 1)
-        with torch.no_grad():
-            output = self.model(data)
-            return output.view_as(X).numpy()
-
-    def get_model_data(self):
-        return torch.tensor([[point.x, point.y] for point in self.view.level.points], dtype=torch.float)
-
-    def get_model_output(self):
-        data = self.get_model_data()
-        data = torch.from_numpy(data).float()
-        with torch.no_grad():
-            output = self.model(data)
-        return output.view(-1).numpy()
-
-    def render(self, a):
-        self.setup_color()
-        data = self.get_model_data()
-        x = data[:, 0]
-        y = data[:, 1]
-        z = self.model_prediction(x, y)
-        min_x, max_x = -3.0, 3.0
-        min_y, max_y = -3.0, 3.0
-        xgrid = (min_x, max_x, 0.1)
-        ygrid = (min_y, max_y, 0.1)
-        X, Y = np.meshgrid(self.np_points(xgrid), self.np_points(ygrid))
-        Z = self.model_prediction(X, Y)        
-        min_z = math.floor(np.min(Z))
-        min_z = min(min_z, self.min_z)
-        max_z = math.ceil(np.max(Z))
-        max_z = max(max_z, self.max_z)
-        self.min_z = min_z
-        self.max_z = max_z
-        fig = plt.figure(figsize=(12, 10))
-        ax = fig.add_subplot(projection='3d')
-        ax.set_xlim([min_x, max_x])
-        ax.set_ylim([min_y, max_y])
-        ax.set_zlim([min_z, max_z])
+    def set_labels(self, ax):
         first_dim_name = 'X'
         second_dim_name = 'Y'
         output_name = 'O1'
@@ -270,15 +186,31 @@ class StudyPlaneGraph(BaseGraph):
         ax.set_xlabel(first_dim_name)
         ax.set_ylabel(second_dim_name)
         ax.set_zlabel(output_name)
-        x_offset = (max_x-min_x)*0.02
-        y_offset = (max_y-min_y)*0.02
-        z_offset = (max_z-min_z)*0.02
-        min_x -= x_offset
-        max_x += x_offset
-        min_y -= y_offset
-        max_y += y_offset
-        min_z -= z_offset
-        max_z += z_offset
+
+    def set_borders(self, ax):
+        ax.set_xlim([self.min_x, self.max_x])
+        ax.set_ylim([self.min_y, self.max_y])
+        ax.set_zlim([self.min_z, self.max_z])
+        x_offset = (self.max_x-self.min_x)*0.02
+        y_offset = (self.max_y-self.min_y)*0.02
+        z_offset = (self.max_z-self.min_z)*0.02
+
+        return self.min_x-x_offset, self.max_x+x_offset, self.min_y-y_offset, self.max_y+y_offset, self.min_z-z_offset, self.max_z+z_offset
+
+    def render(self, a):
+        x, y = self.get_model_data()
+        z = self.model_prediction(x, y)
+        X, Y = self.get_meshgrid()
+        Z = self.model_prediction(X, Y)
+        self.min_z = min(math.floor(np.min(Z)), self.min_z)
+        self.max_z = max(math.ceil(np.max(Z)), self.max_z)
+
+        fig = plt.figure(figsize=(12, 10))
+        ax = fig.add_subplot(projection='3d')
+
+        self.set_labels(ax)
+        min_x, max_x, min_y, max_y, min_z, max_z = self.set_borders(ax)
+
         if self.options.show_surface_projection:
             ax.contourf(X, Y, Z, offset=min_z, cmap=self.plot_cmap, norm=self.plot_norm, levels=self.plot_levels, alpha=0.5)
             with warnings.catch_warnings():
@@ -322,3 +254,63 @@ class StudyPlaneGraph(BaseGraph):
         errors = [z[i]-point.target for i, point in enumerate(self.view.level.points)]
         cols = [colors.to_hex(self.get_color(point.target)) for point in self.view.level.points]
         self.view.set_error(errors, cols)
+
+class MonsterGraph(BaseMainGraph):
+    def __init__(self, view):
+        self.hide_spell = view.level.hide_spell
+        super().__init__(view)
+
+    def draw_point(self, ax, monster, output_level, target_level):
+        m_size = self.view.calc_monster_size()
+        x = monster.x
+        y = monster.y
+        match_color = 'green' if target_level == output_level else 'red'
+        target_circle = plt.Circle((x, y), 0.03*m_size, color=self.get_color(target_level, False), zorder=2)
+        output_circle = plt.Circle((x, y), 0.04*m_size, color=self.get_color(output_level, False), zorder=2)
+        correct_circle = plt.Circle((x, y), 0.05*m_size, color=match_color, zorder=2)
+        ax.add_patch(correct_circle)
+        ax.add_patch(output_circle)
+        ax.add_patch(target_circle)
+        ax.imshow(monster.image, extent=[x-0.05*m_size, x+0.05*m_size, y-0.05*m_size, y+0.05*m_size], zorder=2)
+
+    def draw_hide_spell(self, ax):
+        ax.text(0.0, 0.0, "Iterasimum casted hide spell, you can not see battle field")
+
+    def render(self, a):
+        x, y = self.get_model_data()
+        z = self.model_prediction(x, y)
+        X, Y = self.get_meshgrid()
+        Z = self.model_prediction(X, Y)
+
+        fig = plt.figure(figsize=(8, 8), frameon=False)
+        ax = fig.add_axes([0, 0, 1, 1])
+        plt.axis('off')
+        ax.set_xlim([self.min_x, self.max_x])
+        ax.set_ylim([self.min_y, self.max_y])
+
+        good = 0
+        total = 0
+        output_levels = self.plot_norm(z)
+        level = self.view.level
+        for index, point in enumerate(level.points):
+            target_level = self.plot_norm(point.target)
+            output_level = output_levels[index]
+            good += 1 if target_level == output_level else 0
+            total += 1
+        accuracy = good/total
+        if accuracy+1e-7 > 1.0:
+            self.hide_spell = False
+
+        if self.hide_spell:
+            self.draw_hide_spell(ax)
+        else:
+            ax.contourf(X, Y, Z, cmap=self.plot_cmap, norm=self.plot_norm, levels=self.plot_levels, alpha=1.0)
+            level = self.view.level
+            for index, point in enumerate(level.points):
+                target_level = self.plot_norm(point.target)
+                output_level = output_levels[index]
+                self.draw_point(ax, point, output_level, target_level)
+
+        plt.show()
+        error = sum([abs(z[i]-point.target) for i, point in enumerate(self.view.level.points)])
+        self.view.update_status(error, good/total)
