@@ -448,9 +448,9 @@ class MainView(object):
         yield from self.second_level()
 
     def second_level(self):
-        yield from SplitMonstersLevelsFactory().get_multi_split_levels()
+        #yield from SplitMonstersLevelsFactory().get_multi_split_levels()
         #yield InfoLevel("Let me prepare myself for next night", "./images/wake_up.jpg", None, "It was easy after preparation, let's prepare today too")
-        #yield from StudyPlaneLevelFactory().get_study_levels()
+        yield from StudyPlaneLevelFactory().get_study_levels()
         #yield InfoLevel("Congratulations", "./images/dream.jpg", "congratulations", "Congratulations! You earned your place among creators of the future. Now, you are ready to know what means to be a creator. By playing this game you actually studied machine learning. Join our secret group to continue your education and access to the next chapter of the game. Creators of the future are waiting for you https://www.facebook.com/groups/458107258671703").set_hide_next_button(True)
 
     def first_level(self):

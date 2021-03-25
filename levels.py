@@ -55,11 +55,11 @@ class StudyLineLevel(Level):
         self.disabled_buttons = disabled_buttons
 
 class StudyPlaneLevel(Level):
-    def __init__(self, model, points, error_type, error_limit, level_number, number_of_levels):
+    def __init__(self, model, points, step_size, error_type, error_limit, level_number, number_of_levels):
         super().__init__(LevelType.STUDY_PLANE, level_number, number_of_levels)
         self.model = model
         self.points = points
-        self.step_size = 1.0
+        self.step_size = step_size
         self.error_type = error_type
         self.error_limit = error_limit
 

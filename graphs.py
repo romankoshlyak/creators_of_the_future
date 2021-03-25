@@ -1,3 +1,4 @@
+import warnings
 import math
 import torch
 import numpy as np
@@ -38,8 +39,8 @@ class BaseGraph(object):
 
     def setup_color(self):
         level = self.view.level
-        target = sorted(list(set([point.target for point in level.points])))
-        limit = max(max(target), -min(target))
+        self.plot_target = sorted(list(set([point.target for point in level.points])))
+        limit = max(-self.plot_target[0], self.plot_target[1])
 
         target = self.__get_range(limit, level.step_size)
         cols = self.__get_colors(target[1:-1])
@@ -280,7 +281,9 @@ class StudyPlaneGraph(BaseGraph):
         max_z += z_offset
         if self.options.show_surface_projection:
             ax.contourf(X, Y, Z, offset=min_z, cmap=self.plot_cmap, norm=self.plot_norm, levels=self.plot_levels, alpha=0.5)
-            ax.contour(X, Y, Z, offset=min_z, cmap=self.plot_cmap, norm=self.plot_norm, levels=self.plot_target, alpha=1.0)
+            with warnings.catch_warnings():
+                warnings.filterwarnings("ignore", message="No contour levels were found within the data range.") 
+                ax.contour(X, Y, Z, offset=min_z, cmap=self.plot_cmap, norm=self.plot_norm, levels=self.plot_target, alpha=1.0)
         if self.options.show_surface:
             ax.plot_surface(X, Y, Z, cmap=self.plot_cmap, norm=self.plot_norm, alpha=0.2)
         if self.options.show_wireframe:

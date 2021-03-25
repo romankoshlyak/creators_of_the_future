@@ -9,31 +9,34 @@ class BaseLevelFactory(object):
     def get_outputs(self, model, points):
         return model(self.get_tensor(points)).view(-1).tolist()
 
-    def check_outputs(self, outputs):
+    def check_outputs(self, outputs, step_size):
         for i, output in enumerate(outputs):
-            if (output)%1.0 > 1e-7:
+            if (output)%step_size > 1e-7:
                 print(i, output)
                 assert(False)
 
 class StudyPlaneLevelFactory(BaseLevelFactory):
-    def get_points(self, target_model, points):
+    def get_points(self, target_model, points, step_size):
         outputs = self.get_outputs(target_model, points)
-        self.check_outputs(outputs)
-        return [PointInfo(x, y, z) for (x, y), z in zip(points, output)]
+        self.check_outputs(outputs, step_size)
+        return [PointInfo(x, y, z) for (x, y), z in zip(points, outputs)]
 
     def get_study_levels(self):
         model = LinearModel(0.1, 0.1, 0.5)
         target_model = LinearModel(0.5, 0.5, -0.5)
         points = [(1, 2), (-2, 1)]
-        yield StudyPlaneLevel(model, self.get_points(target_model, points), ErrorType.SUM_LINEAR, 0.5, 1, 3)
+        step_size = 1.0
+        yield StudyPlaneLevel(model, self.get_points(target_model, points, step_size), step_size, ErrorType.SUM_LINEAR, 0.5, 1, 3)
         model = LinearModel(0.4, 0.4, 0.2)
         target_model = LinearModel(-0.25, -0.5, 0.0)
         points = [(-2, -2), (-2, 2), (2, -2), (2, 2)]
-        yield StudyPlaneLevel(model, self.get_points(target_model, points), ErrorType.SUM_LINEAR, 0.5, 2, 3)
+        step_size = 0.5
+        yield StudyPlaneLevel(model, self.get_points(target_model, points, step_size), step_size, ErrorType.SUM_LINEAR, 0.5, 2, 3)
         model = LinearModel(-0.5, -0.5, 0.5)
         target_model = LinearModel(1.0, 0.5, -1.0)
         points = [(1, 2), (1, 0), (2, -2), (-2, 2), (1, -2), (-2, -2)]
-        yield StudyPlaneLevel(model, self.get_points(target_model, points), ErrorType.SUM_LINEAR, 2.0, 3, 3)
+        step_size = 1.0
+        yield StudyPlaneLevel(model, self.get_points(target_model, points, step_size), step_size, ErrorType.SUM_LINEAR, 2.0, 3, 3)
 
 class SplitMonstersLevelsFactory(BaseLevelFactory):
     def get_monsters(self, target_model, points):
