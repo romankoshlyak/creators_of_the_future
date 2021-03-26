@@ -10,6 +10,7 @@ class LevelType(Enum):
     SPLIT_MONSTERS = 3
     STUDY_PLANE = 4
     MULTI_SPLIT_MONSTERS = 5
+    GRADIENT_DESCENT = 6
 
 class ErrorType(Enum):
     SUM_LINEAR = 1
@@ -95,3 +96,7 @@ class MultiSplitMonstersLevel(BaseMonsterLevel):
         self.step_size = step_size
         self.error_type = error_type
         self.error_limit = error_limit
+
+class GradientDescentLevel(Level):
+    def __init__(self, level_number, number_of_levels):
+        super().__init__(LevelType.GRADIENT_DESCENT, level_number, number_of_levels)

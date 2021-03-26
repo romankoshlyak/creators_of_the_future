@@ -314,3 +314,62 @@ class MonsterGraph(BaseMainGraph):
         plt.show()
         error = sum([abs(z[i]-point.target) for i, point in enumerate(self.view.level.points)])
         self.view.update_status(error, good/total)
+
+class GradientDescentGraph(BaseMainGraph):
+    def __init__(self, view):
+        super().__init__(view)
+
+    def draw_point(self, ax, monster, output_level, target_level):
+        m_size = self.view.calc_monster_size()
+        x = monster.x
+        y = monster.y
+        match_color = 'green' if target_level == output_level else 'red'
+        target_circle = plt.Circle((x, y), 0.03*m_size, color=self.get_color(target_level, False), zorder=2)
+        output_circle = plt.Circle((x, y), 0.04*m_size, color=self.get_color(output_level, False), zorder=2)
+        correct_circle = plt.Circle((x, y), 0.05*m_size, color=match_color, zorder=2)
+        ax.add_patch(correct_circle)
+        ax.add_patch(output_circle)
+        ax.add_patch(target_circle)
+        ax.imshow(monster.image, extent=[x-0.05*m_size, x+0.05*m_size, y-0.05*m_size, y+0.05*m_size], zorder=2)
+
+    def draw_hide_spell(self, ax):
+        ax.text(0.0, 0.0, "Iterasimum casted hide spell, you can not see battle field")
+
+    def render(self, a):
+        x, y = self.get_model_data()
+        z = self.model_prediction(x, y)
+        X, Y = self.get_meshgrid()
+        Z = self.model_prediction(X, Y)
+
+        fig = plt.figure(figsize=(8, 8), frameon=False)
+        ax = fig.add_axes([0, 0, 1, 1])
+        plt.axis('off')
+        ax.set_xlim([self.min_x, self.max_x])
+        ax.set_ylim([self.min_y, self.max_y])
+
+        good = 0
+        total = 0
+        output_levels = self.plot_norm(z)
+        level = self.view.level
+        for index, point in enumerate(level.points):
+            target_level = self.plot_norm(point.target)
+            output_level = output_levels[index]
+            good += 1 if target_level == output_level else 0
+            total += 1
+        accuracy = good/total
+        if accuracy+1e-7 > 1.0:
+            self.hide_spell = False
+
+        if self.hide_spell:
+            self.draw_hide_spell(ax)
+        else:
+            ax.contourf(X, Y, Z, cmap=self.plot_cmap, norm=self.plot_norm, levels=self.plot_levels, alpha=1.0)
+            level = self.view.level
+            for index, point in enumerate(level.points):
+                target_level = self.plot_norm(point.target)
+                output_level = output_levels[index]
+                self.draw_point(ax, point, output_level, target_level)
+
+        plt.show()
+        error = sum([abs(z[i]-point.target) for i, point in enumerate(self.view.level.points)])
+        self.view.update_status(error, good/total)

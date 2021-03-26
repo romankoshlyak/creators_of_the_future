@@ -336,7 +336,6 @@ class StudyPlaneView(LevelView):
     PARAM_NAMES = ['Weight 0', 'Weight 1', 'Bias']
     def __init__(self, level, main_view):
         self.level = level
-        self.main_graph = StudyPlaneGraph(self)
         self.error = HTML('Error')
         self.error_value = 1.0
         self.main_graph = StudyPlaneGraph(self)
@@ -449,13 +448,16 @@ class InfoLevelView(LevelView):
 
 class MainView(object):
     def __init__(self):
-        self.levels = list(self.second_level())
+        self.levels = list(self.third_level())
         self.main_box = VBox(children=[])
         self.load_current_level(0)
 
     def all_levels(self):
         yield from self.first_level()
         yield from self.second_level()
+
+    def third_level(self):
+        yield from StudyPlaneLevelFactory().get_learning_rate_levels()
 
     def second_level(self):
         yield InfoLevel("Let me prepare myself for next night", "./images/wake_up.jpg", None, "It was easy after preparation, let's prepare today too")
@@ -507,6 +509,8 @@ class MainView(object):
             return StudyPlaneView(level, self)
         elif level.level_type == LevelType.MULTI_SPLIT_MONSTERS:
             return MultiSplitMonsterLevelView(level, self)
+        elif level.level_type == LevelType.GRADIENT_DESCENT:
+            return GradientDescentLevelView(level, self)
 
     def do_next_level(self):
         self.load_current_level(self.current_level_index+1)

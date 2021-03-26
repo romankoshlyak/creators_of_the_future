@@ -21,6 +21,14 @@ class StudyPlaneLevelFactory(BaseLevelFactory):
         self.check_outputs(outputs, step_size)
         return [PointInfo(x, y, z) for (x, y), z in zip(points, outputs)]
 
+    def get_learning_rate_levels(self):
+        model = LinearModel(0.4, 0.4, 0.2)
+        target_model = LinearModel(-0.25, -0.5, 0.0)
+        points = [(-2, -2), (-2, 2), (2, -2), (2, 2)]
+        step_size = 0.5
+        points = self.get_points(target_model, points, step_size)
+        yield StudyPlaneLevel(model, points, step_size, ErrorType.SUM_LINEAR, 0.5, 2, 3)
+
     def get_study_levels(self):
         model = LinearModel(0.1, 0.1, 0.5)
         target_model = LinearModel(0.5, 0.5, -0.5)
