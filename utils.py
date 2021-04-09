@@ -23,6 +23,7 @@ class Assets(object):
 
 class Images(Assets):
     IMAGES_DIR = os.path.join(Assets.DREAM_DIR, 'images')
+    LEARNING_RATE_MONSTER = os.path.join(IMAGES_DIR, 'apoke.22_00039.png')
     ERROR_MONSTER = os.path.join(IMAGES_DIR, 'apoke.15_00000.png')
     ACCURACY_MONSTER = os.path.join(IMAGES_DIR, 'apoke.04_00067.png')
     ITERATION_MONSTER = os.path.join(IMAGES_DIR, 'apoke.16_00040.png')

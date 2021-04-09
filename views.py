@@ -203,7 +203,7 @@ class MonsterLevelView(LevelView):
     def __init__(self, level, main_view):
         super().__init__(level, main_view)
         self.set_up_learning_rate(level)
-        self.learning_rate_object = StatusObject(Images.ERROR_MONSTER, "Lenos Ratos\n {0:.4f}/{1:.2f}", 0.0).set_reverse(True)
+        self.learning_rate_object = StatusObject(Images.LEARNING_RATE_MONSTER, "Lenos Ratos\n {0:.4f}/{1:.2f}", 0.0).set_reverse(True)
         self.error = StatusObject(Images.ERROR_MONSTER, "Erorisimus\n {0:.6f}/{1:.2f}\n {2}", 0.0).set_reverse(True)
         self.accuracy = StatusObject(Images.ACCURACY_MONSTER, "Acurasimus\n {0:.2f}/{1:.2f}", 0.0)
         self.iteration = StatusObject(Images.ITERATION_MONSTER, "Iterasimus\n {0}/{1:.2f}", 0, 0, self.level.max_iterations)
