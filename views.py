@@ -2,16 +2,31 @@ import copy
 import numpy as np
 from ipywidgets import Image, Layout, Button, VBox, HBox, Label, Box, GridBox, HTML, HTMLMath
 from utils import WidgetsManager, Images, Sounds
-from levels import *
-from level_factories import *
+from levels import LevelType, ErrorType
+from level_factories import MainLevelsFactory
 from models import LinearModel, StudyLineModel
-from graphs import StudyLineGraph, BarGraph, MonsterGraph, StudyPlaneGraph
-from actions import ChangeWeightAction, NextLevelAction, RestartLevelAction
+from graphs import *
+from actions import *
 
 class LevelView(object):
-    def __init__(self, main_view):
+    MINIMUM_LEARNING_RATE = 0.0001
+    def __init__(self, level, main_view):
         self.widgets_manager = WidgetsManager()
+        self.level = level
         self.main_view = main_view
+
+
+    def set_up_learning_rate(self, level):
+        self.learning_rate = self.level.learning_rate
+        self.is_learning_rate_saved = False
+
+    def get_model_data(self):
+        data = torch.tensor([[point.x, point.y] for point in self.level.points], dtype=torch.float)
+        return data
+
+    def get_model_target(self):
+        target = torch.tensor([point.target for point in self.level.points], dtype=torch.float)
+        return target
 
     def do_next_level(self):
         self.main_view.do_next_level()
@@ -26,6 +41,7 @@ class LevelView(object):
 
     def create_button(self, name, action, is_widget = True):
         button = Button(description=name)
+        button.layout.width = '90%'
         button.on_click(action.do_action)
         if is_widget:
             self.widgets_manager.add_widget(button)
@@ -72,13 +88,22 @@ class LevelView(object):
         sound_name = '_'.join(button_name.lower().split())
         return Sounds.get_file(sound_name)
         
-    def get_magic_controls(self, model):
-        all_parameter_controls = []
-        all_parameter_controls.append(Label('Spells:'))
+    def get_all_spells(self):
+        return []
+
+    def get_magic_controls_items(self):
+        items = [Label('Spells:')] + self.get_all_spells()
+        return items
+
+    def get_magic_controls(self):
+        items = self.get_magic_controls_items()
+        return VBox(children=items)
+
+    def get_weight_spells_items(self, model):
         param_index = 0
-        buttons = []
-        for param in model.named_parameters():
-            tensor = param[1].data
+        items = []
+        for param in model.parameters():
+            tensor = param.data
             for i in range(len(tensor.view(-1))):
                 param_name = self.PARAM_NAMES[param_index]
                 param_index += 1
@@ -86,11 +111,62 @@ class LevelView(object):
                 button_name_sub = f'{param_name} Subinimus'
                 add_spell = self.__button_name_to_audio_file(button_name_add)
                 sub_spell = self.__button_name_to_audio_file(button_name_sub)
-                buttons.append(self.create_button(button_name_add, ChangeWeightAction(1.0, tensor, i, self).set_audio_file(add_spell)))
-                buttons.append(self.create_button(button_name_sub, ChangeWeightAction(-1.0, tensor, i, self).set_audio_file(sub_spell)))
-                
-        all_parameter_controls.append(GridBox(children=buttons, layout=Layout(grid_template_columns='auto auto')))
-        return VBox(children=all_parameter_controls)
+                items.append(self.create_button(button_name_add, ChangeWeightAction(1.0, tensor, i, self).set_audio_file(add_spell)))
+                items.append(self.create_button(button_name_sub, ChangeWeightAction(-1.0, tensor, i, self).set_audio_file(sub_spell)))
+        return items
+
+    def get_weight_spells(self, model):
+        items = self.get_weight_spells_items(model)
+        return GridBox(
+            children=items,
+            layout=Layout(
+                grid_template_rows='repeat(4, max-content)',
+                grid_template_columns='50% 50%',
+                grid_template_areas='''
+                "item0 item1"
+                ''')
+       )
+
+    def get_learning_rate_spells_items(self):
+        items = []
+        items.append(self.create_button('Lernos Ratos Minisimus', SaveAndSetLearningRateAction(self, self.MINIMUM_LEARNING_RATE)))
+        items.append(self.create_button('Lernos Ratos Restorisimus', RestoreLearningRateAction(self)))
+        items.append(self.create_button('Lernos Ratos Incrisimus', ChangeLearningRateAction(self, 2.0)))
+        items.append(self.create_button('Lernos Ratos Decrisimus', ChangeLearningRateAction(self, 0.5)))
+        return items
+
+    def get_learning_rate_spells(self):
+        items = self.get_learning_rate_spells_items()
+        return GridBox(
+            children=items,
+            layout=Layout(
+                grid_template_rows='repeat(1, max-content)',
+                grid_template_columns='50% 50%',
+                grid_template_areas='''
+                "item0 item1"
+                ''')
+       )
+
+    def get_learning_rate_controls_items(self):
+        items = [Label('Learning rate:')]
+        items.append(self.learning_rate_label)
+        items.append(self.create_button('Increase', ChangeLearningRateAction(self, 10.0)))
+        items.append(self.create_button('Descrease', ChangeLearningRateAction(self, 0.1)))
+        items = self.index_grid_items(items)
+        return items
+
+    def get_learning_rate_controls(self):
+        items = self.get_learning_rate_controls_items()
+        return GridBox(
+            children=items,
+            layout=Layout(
+                grid_template_rows='repeat(4, max-content)',
+                grid_template_columns='max-content auto auto',
+                grid_template_areas='''
+                "item0 item0 item0"
+                "item1 item2 item3"
+                ''')
+       )
 
 class StatusObject(object):
     def __init__(self, file_name, text_format, value, min_value = 0.0, max_value = 1.0):
@@ -101,6 +177,7 @@ class StatusObject(object):
         self.min_value = min_value
         self.max_value = max_value
         self.reverse = False
+        self.extra_info = None
 
     def set_x_offset(self, x_offset):
         self.x_offset = x_offset
@@ -115,27 +192,46 @@ class StatusObject(object):
     def set_max_value(self, max_value):
         self.max_value = max_value
 
+    def set_extra_info(self, extra_info):
+        self.exra_info = extra_info
+
 class MonsterLevelView(LevelView):
     PARAM_NAMES = ['Witos Seros', 'Witos Unos', 'Bias']
     def __init__(self, level, main_view):
-        super(MonsterLevelView, self).__init__(main_view)
-        self.level = level
-        self.error = StatusObject(Images.ERROR_MONSTER, "Erorisimus\n {0:.2f}/{1:.2f}", 0.0).set_reverse(True)
+        super().__init__(level, main_view)
+        self.set_up_learning_rate(level)
+        self.learning_rate_object = StatusObject(Images.ERROR_MONSTER, "Lenos Ratos\n {0:.4f}/{1:.2f}", 0.0).set_reverse(True)
+        self.error = StatusObject(Images.ERROR_MONSTER, "Erorisimus\n {0:.6f}/{1:.2f}\n {2}", 0.0).set_reverse(True)
         self.accuracy = StatusObject(Images.ACCURACY_MONSTER, "Acurasimus\n {0:.2f}/{1:.2f}", 0.0)
         self.iteration = StatusObject(Images.ITERATION_MONSTER, "Iterasimus\n {0}/{1:.2f}", 0, 0, self.level.max_iterations)
         self.level_status = StatusObject(Images.LEVEL_MONSTER, "Level\n {0}/{1}", self.level.level_number, 0, self.level.number_of_levels)
         stats = [self.accuracy, self.iteration, self.level_status]
-        if (self.level.level_type == LevelType.MULTI_SPLIT_MONSTERS):
+        if self.is_show_error():
             stats = [self.error] + stats
+        if self.is_show_learning_rate():
+            stats = [self.learning_rate_object] + stats
         self.bar_graph = BarGraph(stats)
         self.monster_min_size = 6.0
         self.monster_max_size = 10.0
         self.main_graph = MonsterGraph(self)
+        self.update_learning_rate_label()
+
+    def is_show_error(self):
+        return False
+
+    def is_show_learning_rate(self):
+        return False
 
     def calc_monster_size(self):
         return (self.monster_max_size-self.monster_min_size)*(self.iteration.value)/float(self.level.max_iterations)+self.monster_min_size
 
+    def update_learning_rate_label(self):
+        self.learning_rate_object.value = self.learning_rate
+        self.learning_rate_object.set_max_value(max(self.learning_rate_object.max_value, self.learning_rate))
+        self.bar_graph.rerender()
+
     def update_status(self, error, accuracy):
+        self.error.extra_info = f'{(error-self.error.value):+.6f}'
         self.error.value = error
         self.error.set_max_value(max(self.error.max_value, error))
         self.accuracy.value = accuracy
@@ -144,7 +240,8 @@ class MonsterLevelView(LevelView):
     def update_model(self):
         self.widgets_manager.disable_widgets()
         if self.iteration.value < self.level.max_iterations:
-            self.iteration.value += 1
+            if self.learning_rate > self.MINIMUM_LEARNING_RATE+1e-7:
+                self.iteration.value += 1
             self.main_graph.rerender()
         if self.iteration.value < self.level.max_iterations:
             self.widgets_manager.enable_widgets()
@@ -155,12 +252,20 @@ class MonsterLevelView(LevelView):
 
         self.bar_graph.rerender()
 
+    def get_all_spells(self):
+        return [self.get_learning_rate_spells(), self.get_weight_spells(self.level.model)]
+
     def render(self):
         show_restart_button = not self.level.hide_restart_button
-        return self.get_main_view([self.bar_graph.graph, self.get_level_controls(show_restart_button), self.main_graph.graph, self.get_magic_controls(self.main_graph.model)])
+        return self.get_main_view([self.bar_graph.get_graph(), self.get_level_controls(show_restart_button), self.main_graph.get_graph(), self.get_magic_controls()])
 
 class MultiSplitMonsterLevelView(MonsterLevelView):
-    pass
+    def is_show_error(self):
+        return True
+
+class LearningRateMonstersLevelView(MultiSplitMonsterLevelView):
+    def is_show_learning_rate(self):
+        return True
 
 class StudyLineLevelView(LevelView):
     PARAM_NAMES = ['Weight 0', 'Weight 1', 'Bias']
@@ -335,11 +440,11 @@ class StudyLineLevelView(LevelView):
 class StudyPlaneView(LevelView):
     PARAM_NAMES = ['Weight 0', 'Weight 1', 'Bias']
     def __init__(self, level, main_view):
-        self.level = level
+        super().__init__(level, main_view)
+        self.set_up_learning_rate(level)
         self.error = HTML('Error')
         self.error_value = 1.0
         self.main_graph = StudyPlaneGraph(self)
-        super().__init__(main_view)
 
     def set_error(self, errors, colors):
         if self.level.error_type == ErrorType.SUM_LINEAR:
@@ -429,10 +534,6 @@ class StudyPlaneView(LevelView):
         return self.get_main_view([self.get_level_status(), self.get_level_controls(), self.main_graph.graph, self.get_controls()])
 
 class InfoLevelView(LevelView):
-    def __init__(self, level, main_view):
-        super(InfoLevelView, self).__init__(main_view)
-        self.level = level
-
     def render(self):
         header = Label(self.level.header)
         image = Image(
@@ -446,57 +547,151 @@ class InfoLevelView(LevelView):
 
         return self.get_main_view([header, self.get_level_controls(False, False, self.level.hide_next_button), image, story])
 
+class LearningRateLevelView(StudyPlaneView):
+    GRAPHS = ['Error space', 'Problem space']
+    def __init__(self, level, main_view):
+        super().__init__(level, main_view)
+        self.model = self.level.model
+        self.data = self.get_model_data()
+        self.target = self.get_model_target()
+        self.loss = self.get_model_loss()
+        self.learning_rate = level.learning_rate
+        self.learning_rate_label = Label("Learning rate")
+        self.graph_box = VBox(children=[])
+        self.graph_selector = self.setup_graph_selector()
+
+        self.update_error()
+        self.update_learning_rate_label()
+
+    def setup_graph_selector(self):
+        is_error_space_3d = len(self.model.get_weights()) == 3
+        error_space_graph = None
+        if is_error_space_3d:
+            error_space_graph = ErrorSpace3dGraph(self)
+        else:
+            error_space_graph = ErrorSpace2dGraph(self)
+        graph_selector = widgets.Dropdown(options=self.GRAPHS, description='View:')
+
+        action = SelectGraphAction(self, self.graph_box, graph_selector, [error_space_graph, StudyPlaneGraph(self)])
+        action.do_action()
+        graph_selector.observe(action.do_action, names='value')
+        return graph_selector
+
+    def update_learning_rate_label(self):
+        self.learning_rate_label.value = f"{self.learning_rate:.5f}"
+
+    def get_model_loss(self):
+        if self.level.error_type == ErrorType.SUM_LINEAR:
+            return nn.L1Loss(reduction='sum')
+        raise f"Unsupported error_type: {self.level.error_type}"
+
+    def set_error(self, output, target):
+        if self.level.error_type == ErrorType.SUM_LINEAR:
+            error_name = "Sum linear error"
+            part_format = "|{}|"
+            all_format = "{}"
+            error = self.loss(output, target)
+        else:
+            raise f"Unsupported error_type: {self.level.error_type}"
+
+        diff = output-self.target
+        parts = [part_format.format(f'{d:.2f}') for d in diff.tolist()]
+        self.error_value = error.item()
+        error = f'{error_name} ' + all_format.format('+'.join(parts), len(parts))  + f'={error:.4f} Limit={self.level.error_limit:.4f}'
+        self.error.value = error
+
+    def update_error(self):
+        output = self.model(self.data).view(-1)
+        self.set_error(output, self.target)
+
+    def update_model(self):
+        self.widgets_manager.disable_widgets()
+        self.current_graph.rerender()
+        self.widgets_manager.enable_widgets()
+        self.update_error()
+        self.next_level_button.disabled = bool(self.error_value > self.level.error_limit+1e-5)
+
+    def get_weight_controls_items(self):
+        model = self.level.model
+        param_index = 0
+        items = [Label('Parameters:')]
+        buttons = []
+        for param in model.parameters():
+            tensor = param.data
+            for i in range(len(tensor.view(-1))):
+                param_name = self.PARAM_NAMES[param_index]
+                param_index += 1
+                items.append(Label(param_name))
+                button = self.create_button('Add', ChangeWeightAction(1.0, tensor, i, self))
+                buttons.append(button)
+                items.append(button)
+                button = self.create_button('Sub', ChangeWeightAction(-1.0, tensor, i, self))
+                buttons.append(button)
+                items.append(button)
+                
+        self.buttons = buttons
+        items = self.index_grid_items(items)
+        return items
+
+    def get_weight_controls(self):
+        items = self.get_weight_controls_items()
+        return GridBox(
+            children=items,
+            layout=Layout(
+                grid_template_rows='repeat(4, max-content)',
+                grid_template_columns='max-content auto auto',
+                grid_template_areas='''
+                "item0 item0 item0"
+                "item1 item2 item3"
+                "item4 item5 item6"
+                "item7 item8 item9"
+                ''')
+       )
+
+    def get_options_controls_items(self):
+        items = [Label('Options:')]
+        items.append(self.graph_selector)
+        return items
+
+
+    def get_options_controls(self):
+        items = self.get_options_controls_items()
+        return GridBox(
+            children=items,
+            layout=Layout(
+                grid_template_rows='repeat(4, max-content)',
+                grid_template_columns='max-content auto auto',
+                grid_template_areas='''
+                "item0"
+                "item1"
+                ''')
+       )
+
+    def get_controls(self):
+        return VBox(children=[self.get_options_controls(), self.get_learning_rate_controls(), self.get_weight_controls()])
+
+    def get_level_status(self):
+        items = self.index_grid_items([HTML('<h1>Prepare yourself for the next night</h1>'), HTML(f'Level {self.level.level_number}/{self.level.number_of_levels}'), self.error])
+        return GridBox(
+            children=items,
+            layout=Layout(
+                grid_template_rows='repeat(2, max-content)',
+                grid_template_columns='20% 80%',
+                grid_template_areas='''
+                "item0 item0"
+                "item1 item2"
+                ''')
+       )
+
+    def render(self):
+        return self.get_main_view([self.get_level_status(), self.get_level_controls(), self.graph_box, self.get_controls()])
+
+
 class MainView(object):
     def __init__(self):
-        self.levels = list(self.third_level())
+        self.levels = list(MainLevelsFactory().all_levels())
         self.main_box = VBox(children=[])
         self.load_current_level(0)
-
-    def all_levels(self):
-        yield from self.first_level()
-        yield from self.second_level()
-
-    def third_level(self):
-        yield from StudyPlaneLevelFactory().get_learning_rate_levels()
-
-    def second_level(self):
-        yield InfoLevel("Let me prepare myself for next night", "./images/wake_up.jpg", None, "It was easy after preparation, let's prepare today too")
-        yield from StudyPlaneLevelFactory().get_study_levels()
-        yield InfoLevel("You are back", "./images/dream.jpg", None, "Warning, <b>Iterasimums</b> learned a new hide spell and he can hide battle field from you, but <b>Acurasimus</b> bring his friend <b>Erorisimus</b> to help out in such situation")
-        yield from SplitMonstersLevelsFactory().get_multi_split_levels()
-        yield InfoLevel("Congratulations", "./images/dream.jpg", None, "Congratulations! You once again show your potential, the way you handlered hide spell was impressive").set_hide_next_button(True)
-
-    def first_level(self):
-        yield from self.intro_levels()
-        yield from self.study_line_levels()
-        yield from self.monster_levels()
-
-    def intro_levels(self):
-        yield InfoLevel("After a long day", "./images/sleep.jpg", "after_a_long_day", "After a long day, it's time to go to sleep<br/>Click Next level, to continue...")
-        yield InfoLevel("Welcome", "./images/dream.jpg", "welcome", "Welcome to the creators world. You have been choosen to fight on the side of the future. There is no time to get a proper training, since we are in the middle of the battle, so I will set up magic interface for you. Just cast spells and we hope you will lead <b>Acurasimus</b> to the victory over <b>Iterasimus<b/>")
-        yield from SplitMonstersLevelsFactory().get_intro_level()
-        yield InfoLevel("You had no chance", "./images/apoke.16_00040.png", "you_had_no_chance", "You had no chance to beat <b>Iterasimus</b>") 
-        yield InfoLevel("Oh... no", "./images/dream.jpg", "o_no", "Oh... no, you lost the battle. But the fight for the future is ongoing. We see the potential in you to became the greatest creator of all times, we will give you instructions how to prepare youself for the next night ...")
-
-    def study_line_levels(self):
-        yield InfoLevel("What a strange night", "./images/wake_up.jpg", "what_a_strange_night", "What a strange night! Let me prepare myself for the next battle")
-        yield StudyLineLevel(StudyLineModel(0.0, -1.0, 0.0), StudyLineModel(0.0, -1.0, -0.5), [True, True, True, True, True, False], 1, 10)
-        yield StudyLineLevel(StudyLineModel(1.0, 0.1, 0.0), StudyLineModel(1.0, 0.1, 0.5), [True, True, True, True, False, True], 2, 10)
-        yield StudyLineLevel(StudyLineModel(1.0, 0.9, 0.0), StudyLineModel(1.0, 0.4, 0.0), [True, True, True, False, True, True], 3, 10)
-        yield StudyLineLevel(StudyLineModel(1.0, -2.0, 0.0), StudyLineModel(1.0, -1.5, 0.0), [True, True, False, True, True, True], 4, 10)
-        yield StudyLineLevel(StudyLineModel(-1.0, -2.0, 0.0), StudyLineModel(-1.5, -2.0, 0.0), [True, False, True, True, True, True], 5, 10)
-        yield InfoLevel("You have no chance", "./images/apoke.16_00040.png", "you_have_no_chance", "You have no chance, I will win again ...")
-        yield StudyLineLevel(StudyLineModel(1.0, -2.0, 0.0), StudyLineModel(1.5, -2.0, 0.0), [False, True, True, True, True, True], 6, 10)
-        yield StudyLineLevel(StudyLineModel(0.5, 0.5, 0.0), StudyLineModel(0.7, 0.3, 0.0), [False, False, False, False, True, True], 7, 10)
-        yield StudyLineLevel(StudyLineModel(0.5, 0.5, 0.0), StudyLineModel(0.7, 0.3, 0.5), [], 8, 10)
-        yield StudyLineLevel(StudyLineModel(-0.5, -0.5, 0.0), StudyLineModel(0.7, 0.3, -0.3), [], 9, 10)
-        yield StudyLineLevel(StudyLineModel(1.0, 0.3, 0.0), StudyLineModel(-1.0, 0.3, -0.7), [], 10, 10)
-
-    def monster_levels(self):
-        yield InfoLevel("Last night was crazy", "./images/sleep.jpg", "last_night", "Last night was crazy. I can not believe I spent half of the day in the training. What a silly move from my side! Time to go into the darkness and get some rest ...")
-        yield InfoLevel("You are back", "./images/dream.jpg", "you_are_back", "You are back, we were waiting for you! Don't panic, you can win now. I know that you are not a real creator yet and you are scared, but I believe in you. Go and bring us a victory this time!")
-        yield from SplitMonstersLevelsFactory().get_main_levels()
-        yield InfoLevel("Congratulations", "./images/dream.jpg", "congratulations", "Congratulations! You earned your place among creators of the future. Now, you are ready to know what means to be a creator. By playing this game you actually studied machine learning. Join our secret group to continue your education and access to the next chapter of the game. Creators of the future are waiting for you https://www.facebook.com/groups/458107258671703")
 
     def get_view_for_level(self, level):
         if level.level_type == LevelType.STUDY_LINE:
@@ -509,8 +704,10 @@ class MainView(object):
             return StudyPlaneView(level, self)
         elif level.level_type == LevelType.MULTI_SPLIT_MONSTERS:
             return MultiSplitMonsterLevelView(level, self)
-        elif level.level_type == LevelType.GRADIENT_DESCENT:
-            return GradientDescentLevelView(level, self)
+        elif level.level_type == LevelType.LEARNING_RATE:
+            return LearningRateLevelView(level, self)
+        elif level.level_type == LevelType.LEARNING_RATE_MONSTERS:
+            return LearningRateMonstersLevelView(level, self)
 
     def do_next_level(self):
         self.load_current_level(self.current_level_index+1)

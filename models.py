@@ -2,12 +2,23 @@ import torch
 import torch.nn as nn
 
 class LinearModel(nn.Module):
-    def __init__(self, w1, w2, b1):
+    def __init__(self, w1, w2, b1, bias=True):
         super(LinearModel, self).__init__()
-        self.linear = nn.Linear(2, 1)
+        self.linear = nn.Linear(2, 1, bias)
+        self.set_weights(w1, w2, b1)
+
+    def set_weights(self, w1, w2, b1):
         self.linear.weight.data[0, 0] = w1
         self.linear.weight.data[0, 1] = w2
-        self.linear.bias.data[0] = b1
+        if self.linear.bias is not None:
+            self.linear.bias.data[0] = b1
+        return self
+
+    def get_weights(self):
+        weights = self.linear.weight.data.view(-1).tolist()
+        if self.linear.bias is not None:
+            weights += self.linear.bias.view(-1).tolist()
+        return weights
 
     def forward(self, x):
         return self.linear(x)

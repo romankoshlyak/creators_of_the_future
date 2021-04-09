@@ -32,9 +32,51 @@ class ChangeWeightAction(ButtonAction):
         return self
 
     def do_action(self, *args):
-        self.tensor.view(-1)[self.index] += self.mult * 0.1
+        self.tensor.view(-1)[self.index] += self.mult * self.view.learning_rate
         Sounds.play_audio(self.audio_file)
         self.view.update_model()
+
+class ChangeLearningRateAction(ButtonAction):
+    def __init__(self, view, mult):
+        self.view = view
+        self.mult = mult
+
+    def do_action(self, *args):
+        if not self.view.is_learning_rate_saved:
+            self.view.learning_rate *= self.mult
+            self.view.update_learning_rate_label()
+
+class SaveAndSetLearningRateAction(ButtonAction):
+    def __init__(self, view, value):
+        self.view = view
+        self.value = value
+
+    def do_action(self, *args):
+        self.view.is_learning_rate_saved = True
+        self.view.learning_rate_saved = self.view.learning_rate
+        self.view.learning_rate = self.value
+        self.view.update_learning_rate_label()
+
+class RestoreLearningRateAction(ButtonAction):
+    def __init__(self, view):
+        self.view = view
+
+    def do_action(self, *args):
+        self.view.is_learning_rate_saved = False
+        self.view.learning_rate = self.view.learning_rate_saved
+        self.view.update_learning_rate_label()
+
+class SelectGraphAction(ButtonAction):
+    def __init__(self, view, graph_box, selector, graphs):
+        self.view = view
+        self.graph_box = graph_box
+        self.selector = selector
+        self.graphs = graphs
+
+    def do_action(self, *args):
+        self.view.current_graph = self.graphs[self.selector.index]
+        self.view.current_graph.rerender()
+        self.graph_box.children = [self.view.current_graph.get_graph()]
 
 class ChooseDimensionAction(ButtonAction):
     def __init__(self, application, graph, dim_number, dim_selector):

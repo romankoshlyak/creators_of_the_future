@@ -1,32 +1,43 @@
 import warnings
 import math
+import copy
 import torch
 import numpy as np
 import ipywidgets as widgets
+import torch.nn as nn
 from matplotlib import colors
 import matplotlib.pyplot as plt
 
 class BaseGraph(object):
     def __init__(self):
         self.graph_update = widgets.IntSlider(max=100000)
-        self.graph = widgets.interactive_output(self.render, {'a' : self.graph_update})
+        self.__graph = None
+
+    def get_graph(self):
+        if self.__graph is None:
+            self.__graph = widgets.interactive_output(self.render, {'a' : self.graph_update})
+        return self.__graph
 
     def rerender(self):
         self.graph_update.value = self.graph_update.value + 1
 
-
 class BaseMainGraph(BaseGraph):
     def __init__(self, view):
+        super().__init__()
+        self.setup_base_main(view)
+
+    def setup_color(self):
+        target = [point.target for point in self.view.level.points]
+        self.min_z = min(target)
+        self.max_z = max(target)
+        self.__setup_color()
+
+    def setup_base_main(self, view):
         self.view = view
         self.model = view.level.model
         self.min_x, self.max_x = -3.0, 3.0
         self.min_y, self.max_y = -3.0, 3.0
         self.step = 0.1
-        target = [point.target for point in self.view.level.points]
-        self.min_z = min(target)
-        self.max_z = max(target)
-        self.__setup_color()
-        super().__init__()
 
     def __get_colors(self, target):
         limit = max(abs(target[0]), abs(target[-1]))
@@ -60,7 +71,7 @@ class BaseMainGraph(BaseGraph):
         self.plot_norm = colors.BoundaryNorm(levels, self.plot_cmap.N)
         self.plot_levels = levels
 
-    def __np_points(self, grid):
+    def np_points(self, grid):
         eps = 1e-7
         return np.arange(grid[0], grid[1]+eps, grid[2])
 
@@ -82,26 +93,46 @@ class BaseMainGraph(BaseGraph):
             output = self.model(data)
             return output.view_as(X).numpy()
 
-    def get_model_data(self):
+    def get_model_target(self):
+        target = torch.tensor([point.target for point in self.view.level.points], dtype=torch.float)
+        return target
+
+    def get_model_data_all(self):
         data = torch.tensor([[point.x, point.y] for point in self.view.level.points], dtype=torch.float)
+        return data
+
+    def get_model_data(self):
+        data = self.get_model_data_all()
         return data[:, 0], data[:, 1]
 
     def get_meshgrid(self):
         xgrid = (self.min_x, self.max_x, self.step)
         ygrid = (self.min_y, self.max_y, self.step)
-        X, Y = np.meshgrid(self.__np_points(xgrid), self.__np_points(ygrid))
+        X, Y = np.meshgrid(self.np_points(xgrid), self.np_points(ygrid))
         return X, Y
+
+    def set_borders(self, ax):
+        ax.set_xlim([self.min_x, self.max_x])
+        ax.set_ylim([self.min_y, self.max_y])
+        ax.set_zlim([self.min_z, self.max_z])
+        x_offset = (self.max_x-self.min_x)*0.02
+        y_offset = (self.max_y-self.min_y)*0.02
+        z_offset = (self.max_z-self.min_z)*0.02
+
+        return self.min_x-x_offset, self.max_x+x_offset, self.min_y-y_offset, self.max_y+y_offset, self.min_z-z_offset, self.max_z+z_offset
+
 
 class BarGraph(BaseGraph):
     def __init__(self, statuses):
+        super().__init__()
+        self.length = 10
         self.statuses = statuses
         self.set_statuses_offset()
-        super().__init__()
 
     def set_statuses_offset(self):
         size_sum = sum([status.get_expected_length() for status in self.statuses])
-        total = 8.0
-        offset = 0.5
+        total = self.length
+        offset = 0.0
         total_spaces = total-2*offset-size_sum
         each_space = total_spaces / (len(self.statuses)-1)
         x_offset = offset
@@ -110,9 +141,9 @@ class BarGraph(BaseGraph):
             x_offset += status.get_expected_length() + each_space
 
     def render(self, a):
-        fig = plt.figure(figsize=(8, 1), frameon=False)
+        fig = plt.figure(figsize=(self.length, 1), frameon=False)
         ax = fig.add_axes([0, 0, 1, 1])
-        ax.set_xlim([0, 8])
+        ax.set_xlim([0, self.length])
         ax.set_ylim([0, 1])
         plt.axis('off')
 
@@ -123,7 +154,10 @@ class BarGraph(BaseGraph):
                 y_offset = 1.0-y_offset
             rect = plt.Rectangle((status.x_offset, y_offset), 1, (1.0-y_offset), color='white', alpha=0.8, zorder=2)
             ax.add_patch(rect)
-            ax.text(status.x_offset+1, 0.5, status.text_format.format(status.value, status.max_value))
+            args = [status.value, status.max_value]
+            if status.extra_info is not None:
+                args.append(status.extra_info)
+            ax.text(status.x_offset+1, 0.5, status.text_format.format(*args))
 
         plt.show()
 
@@ -174,8 +208,9 @@ class StudyPlaneGraphOptions(object):
 
 class StudyPlaneGraph(BaseMainGraph):
     def __init__(self, view):
-        self.options = StudyPlaneGraphOptions()
         super().__init__(view)
+        self.options = StudyPlaneGraphOptions()
+        self.setup_color()
 
     def set_labels(self, ax):
         first_dim_name = 'X'
@@ -186,16 +221,6 @@ class StudyPlaneGraph(BaseMainGraph):
         ax.set_xlabel(first_dim_name)
         ax.set_ylabel(second_dim_name)
         ax.set_zlabel(output_name)
-
-    def set_borders(self, ax):
-        ax.set_xlim([self.min_x, self.max_x])
-        ax.set_ylim([self.min_y, self.max_y])
-        ax.set_zlim([self.min_z, self.max_z])
-        x_offset = (self.max_x-self.min_x)*0.02
-        y_offset = (self.max_y-self.min_y)*0.02
-        z_offset = (self.max_z-self.min_z)*0.02
-
-        return self.min_x-x_offset, self.max_x+x_offset, self.min_y-y_offset, self.max_y+y_offset, self.min_z-z_offset, self.max_z+z_offset
 
     def render(self, a):
         x, y = self.get_model_data()
@@ -251,14 +276,11 @@ class StudyPlaneGraph(BaseMainGraph):
 
         plt.show()
 
-        errors = [z[i]-point.target for i, point in enumerate(self.view.level.points)]
-        cols = [colors.to_hex(self.get_color(point.target)) for point in self.view.level.points]
-        self.view.set_error(errors, cols)
-
 class MonsterGraph(BaseMainGraph):
     def __init__(self, view):
-        self.hide_spell = view.level.hide_spell
         super().__init__(view)
+        self.setup_color()
+        self.hide_spell = view.level.hide_spell
 
     def draw_point(self, ax, monster, output_level, target_level):
         m_size = self.view.calc_monster_size()
@@ -315,61 +337,143 @@ class MonsterGraph(BaseMainGraph):
         error = sum([abs(z[i]-point.target) for i, point in enumerate(self.view.level.points)])
         self.view.update_status(error, good/total)
 
-class GradientDescentGraph(BaseMainGraph):
+class ErrorSpaceBaseGraph(BaseMainGraph):
     def __init__(self, view):
         super().__init__(view)
+        self.levels = [8.0, 4.0, 2.0]
+        self.colors = ['blue', 'green', 'red']
+        self.linestyles = [(0, (5, 5)), (0, (5, 5)), (0, (5, 5))]
 
-    def draw_point(self, ax, monster, output_level, target_level):
-        m_size = self.view.calc_monster_size()
-        x = monster.x
-        y = monster.y
-        match_color = 'green' if target_level == output_level else 'red'
-        target_circle = plt.Circle((x, y), 0.03*m_size, color=self.get_color(target_level, False), zorder=2)
-        output_circle = plt.Circle((x, y), 0.04*m_size, color=self.get_color(output_level, False), zorder=2)
-        correct_circle = plt.Circle((x, y), 0.05*m_size, color=match_color, zorder=2)
-        ax.add_patch(correct_circle)
-        ax.add_patch(output_circle)
-        ax.add_patch(target_circle)
-        ax.imshow(monster.image, extent=[x-0.05*m_size, x+0.05*m_size, y-0.05*m_size, y+0.05*m_size], zorder=2)
+    def get_model_data(self):
+        model = copy.deepcopy(self.model)
+        data = self.get_model_data_all()
+        target = self.get_model_target()
+        loss = nn.L1Loss(reduction='sum')
+        return (model, data, target, loss)
 
-    def draw_hide_spell(self, ax):
-        ax.text(0.0, 0.0, "Iterasimum casted hide spell, you can not see battle field")
+    def func_array(self, model_data, X, Y, z, ind=np.array([0,1,2])):
+        res_shape = X.shape
+        X = X.reshape(-1)
+        Y = Y.reshape(-1)
+        V = np.empty_like(X)
+        n = len(X)
+        for i in range(n):
+            args = np.array([X[i], Y[i], z])
+            V[i] = self.func_fast(model_data, *args[ind])
+        return V.reshape(res_shape)
+
+    def func_fast(self, model_data, x, y, z):
+        model, data, target, loss = model_data
+        model.set_weights(x, y, z)
+        with torch.no_grad():
+            output = model(data).view_as(target)
+            return loss(output, target).item()
+
+class ErrorSpace2dGraph(ErrorSpaceBaseGraph):
+    def set_labels(self, ax, view):
+        ax.set_title("Error landscape")
+        ax.set_xlabel(view.PARAM_NAMES[0])
+        ax.set_ylabel(view.PARAM_NAMES[1])
 
     def render(self, a):
-        x, y = self.get_model_data()
-        z = self.model_prediction(x, y)
+        fig = plt.figure(figsize=(10, 10))
+        ax = fig.add_subplot()
+        self.set_labels(ax, self.view)
         X, Y = self.get_meshgrid()
-        Z = self.model_prediction(X, Y)
+        model = self.model
+        x, y = model.get_weights()
+        z = 0
+        point_color = 'red'
 
-        fig = plt.figure(figsize=(8, 8), frameon=False)
-        ax = fig.add_axes([0, 0, 1, 1])
-        plt.axis('off')
-        ax.set_xlim([self.min_x, self.max_x])
-        ax.set_ylim([self.min_y, self.max_y])
-
-        good = 0
-        total = 0
-        output_levels = self.plot_norm(z)
-        level = self.view.level
-        for index, point in enumerate(level.points):
-            target_level = self.plot_norm(point.target)
-            output_level = output_levels[index]
-            good += 1 if target_level == output_level else 0
-            total += 1
-        accuracy = good/total
-        if accuracy+1e-7 > 1.0:
-            self.hide_spell = False
-
-        if self.hide_spell:
-            self.draw_hide_spell(ax)
-        else:
-            ax.contourf(X, Y, Z, cmap=self.plot_cmap, norm=self.plot_norm, levels=self.plot_levels, alpha=1.0)
-            level = self.view.level
-            for index, point in enumerate(level.points):
-                target_level = self.plot_norm(point.target)
-                output_level = output_levels[index]
-                self.draw_point(ax, point, output_level, target_level)
+        model_data = self.get_model_data()
+        ax.scatter(x, y, color=point_color)
+        V = self.func_array(model_data, X, Y, z)
+        mi = np.min(V)
+        ma = np.max(V)
+        for level, color, linestyle in zip(self.levels, self.colors, self.linestyles):
+            if mi < level and level < ma:
+                cs = ax.contour(X, Y, V, levels=[level], colors=[color], linestyles=[linestyle])
+                ax.clabel(cs)
 
         plt.show()
-        error = sum([abs(z[i]-point.target) for i, point in enumerate(self.view.level.points)])
-        self.view.update_status(error, good/total)
+
+class ErrorSpace3dGraph(ErrorSpaceBaseGraph):
+    def __init__(self, view):
+        super().__init__(view)
+        self.__setup()
+
+    def __setup(self):
+        self.min_z = -3.0
+        self.max_z = 3.0
+        mult = 3
+        xgrid = (self.min_x, self.max_x, self.step*mult)
+        ygrid = (self.min_y, self.max_y, self.step*mult)
+        zgrid = (self.min_z, self.max_z, self.step*mult)
+        X, Y = np.meshgrid(self.np_points(xgrid), self.np_points(ygrid))
+        Z = self.np_points(zgrid)
+        V = np.repeat(np.expand_dims(X.copy(), axis=0), len(Z), axis=0)
+        model_data = self.get_model_data()
+        for zi, z in enumerate(Z):
+            V[zi] = self.func_array(model_data, X, Y, z)
+        self.X = X
+        self.Y = Y
+        self.Z = Z
+        self.V = V
+
+    def set_labels(self, ax, view):
+        ax.set_title("Error landscape")
+        ax.set_xlabel(view.PARAM_NAMES[0])
+        ax.set_ylabel(view.PARAM_NAMES[1])
+        ax.set_zlabel(view.PARAM_NAMES[2])
+
+    def indexer(self, a, indexes):
+        return [a[i] for i in indexes]
+
+    def draw_projection(self, ax, model_data, grids, zdirs, offsets, point, levels, colors, point_color, ind):
+        M1, M2 = np.meshgrid(self.np_points(grids[ind[0]]), self.np_points(grids[ind[1]]))
+        V = self.func_array(model_data, M1, M2, point[ind[2]], ind)
+        mi = np.min(V)
+        ma = np.max(V)
+        for level, color in zip(levels, colors):
+            if mi < level and level < ma:
+                ax.contour(*self.indexer([M1, M2, V], ind), zdir=zdirs[ind[2]], offset=offsets[ind[2]], levels=[level], colors=[color])
+
+        point_pr = list(point)
+        point_pr[ind[2]] = offsets[ind[2]]
+        line = list([[p,p_pr] for p, p_pr in zip(point, point_pr)])
+        ax.scatter(*point_pr, color=point_color)
+        ax.plot(*line, linestyle=(0, (5, 10)), c='grey')
+
+    def render(self, a):
+        fig = plt.figure(figsize=(12, 10))
+        ax = fig.add_subplot(projection='3d')
+        self.set_labels(ax, self.view)
+        min_x, max_x, min_y, max_y, min_z, max_z = self.set_borders(ax)
+
+        for zi, z in enumerate(self.Z):
+            mi = np.min(self.V[zi])
+            ma = np.max(self.V[zi])
+            for level, color, linestyle in zip(self.levels, self.colors, self.linestyles):
+                if mi < level and level < ma:
+                    ax.contour(self.X, self.Y, self.V[zi], offset=z, levels=[level], colors=[color], linestyles=[linestyle])
+
+        model = self.model
+        x, y, z = model.get_weights()
+
+        point_color = 'red'
+        ax.scatter(x, y, z, color=point_color)
+        xgrid = (self.min_x, self.max_x, self.step)
+        ygrid = (self.min_y, self.max_y, self.step)
+        zgrid = (self.min_z, self.max_z, self.step)
+        model_data = self.get_model_data()
+        grids = (xgrid, ygrid, zgrid)
+        zdirs = ('x', 'y', 'z')
+        offsets = (min_x, max_y, min_z)
+        point = (x, y, z)
+        index_data = (grids, zdirs, offsets, point)
+        args = (ax, model_data, *index_data, self.levels, self.colors, point_color)
+        self.draw_projection(*args, np.array([0, 1, 2]))
+        self.draw_projection(*args, np.array([0, 2, 1]))
+        self.draw_projection(*args, np.array([2, 1, 0]))
+
+        plt.show()
