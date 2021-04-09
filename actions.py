@@ -52,19 +52,21 @@ class SaveAndSetLearningRateAction(ButtonAction):
         self.value = value
 
     def do_action(self, *args):
-        self.view.is_learning_rate_saved = True
-        self.view.learning_rate_saved = self.view.learning_rate
-        self.view.learning_rate = self.value
-        self.view.update_learning_rate_label()
+        if not self.view.is_learning_rate_saved:
+            self.view.is_learning_rate_saved = True
+            self.view.learning_rate_saved = self.view.learning_rate
+            self.view.learning_rate = self.value
+            self.view.update_learning_rate_label()
 
 class RestoreLearningRateAction(ButtonAction):
     def __init__(self, view):
         self.view = view
 
     def do_action(self, *args):
-        self.view.is_learning_rate_saved = False
-        self.view.learning_rate = self.view.learning_rate_saved
-        self.view.update_learning_rate_label()
+        if self.view.is_learning_rate_saved:
+            self.view.is_learning_rate_saved = False
+            self.view.learning_rate = self.view.learning_rate_saved
+            self.view.update_learning_rate_label()
 
 class SelectGraphAction(ButtonAction):
     def __init__(self, view, graph_box, selector, graphs):

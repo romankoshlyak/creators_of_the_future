@@ -1,5 +1,5 @@
 from utils import Images
-from models import LinearModel, XYModel
+from models import LinearModel
 from levels import *
 
 class BaseLevelFactory(object):
