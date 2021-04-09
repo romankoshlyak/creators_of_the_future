@@ -1,3 +1,4 @@
+import hashlib
 from utils import Images
 from models import LinearModel
 from levels import *
@@ -172,6 +173,14 @@ class MonstersLevelsFactory(BaseLevelFactory):
         yield SplitMonstersLevel(model, levels, colors, monsters, 3, 3).set_max_iterations(30)
 
 class MainLevelsFactory(BaseLevelFactory):
+    def set_level_codes(self, salt, gen):
+        levels = list(gen)
+        for i, level in enumerate(levels):
+            sha = hashlib.sha256()
+            sha.update(f'{salt}:{i}'.encode())
+            code = sha.hexdigest()[:6].strip().lower()
+            yield level.set_code(code)
+
     def set_level_numbers(self, gen):
         levels = list(gen)
         for i, level in enumerate(levels):
@@ -180,7 +189,7 @@ class MainLevelsFactory(BaseLevelFactory):
     def all_levels(self):
         #yield from self.first_level()
         #yield from self.second_level()
-        yield from self.third_level()
+        yield from self.set_level_codes("SALT_3", self.third_level())
 
     def third_level(self):
         yield InfoLevel("Let me prepare myself for next night", "./images/wake_up.jpg", None, "It was easy after preparation, let's prepare today too")

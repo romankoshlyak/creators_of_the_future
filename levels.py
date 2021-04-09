@@ -33,6 +33,7 @@ class MonsterInfo(PointInfo):
 class Level(object):
     def __init__(self, level_type):
         self.level_type = level_type
+        self.code = None
 
     def set_level_type(self, level_type):
         self.level_type = level_type
@@ -43,6 +44,10 @@ class Level(object):
 
     def set_number_of_levels(self, number_of_levels):
         self.number_of_levels = number_of_levels
+        return self
+
+    def set_code(self, code):
+        self.code = code
         return self
 
 class InfoLevel(Level):

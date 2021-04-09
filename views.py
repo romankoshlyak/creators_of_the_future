@@ -28,6 +28,9 @@ class LevelView(object):
         target = torch.tensor([point.target for point in self.level.points], dtype=torch.float)
         return target
 
+    def go_to_level(self, level_code):
+        self.main_view.go_to_level(level_code)
+
     def do_next_level(self):
         self.main_view.do_next_level()
 
@@ -61,6 +64,10 @@ class LevelView(object):
 
     def get_level_controls(self, show_restart_button = True, disable_next_button = True, hide_next_button = False):
         items = []
+        code_text = widgets.Text(description=f'Level {self.level.code}')
+        code_text.layout.width = '90%'
+        items.append(code_text)
+        items.append(self.create_button('Go To Level', GoToLevelAction(self, code_text), False))
         if show_restart_button:
             items.append(self.create_button('Restart level', RestartLevelAction(self), False))
         else:
@@ -81,6 +88,7 @@ class LevelView(object):
                 grid_template_columns='50% 50%',
                 grid_template_areas='''
                 "item0 item1"
+                "item2 item3"
                 ''')
        )
 
@@ -713,6 +721,11 @@ class MainView(object):
             return LearningRateLevelView(level, self)
         elif level.level_type == LevelType.LEARNING_RATE_MONSTERS:
             return LearningRateMonstersLevelView(level, self)
+
+    def go_to_level(self, level_code):
+        for i, level in enumerate(self.levels):
+            if level.code == level_code:
+                self.load_current_level(i)
 
     def do_next_level(self):
         self.load_current_level(self.current_level_index+1)

@@ -95,6 +95,14 @@ class ChooseDimensionAction(ButtonAction):
             self.graph.second_dim = dim_index
         self.application.rerender()
 
+class GoToLevelAction(ButtonAction):
+    def __init__(self, view, code_text):
+        self.view = view
+        self.code_text = code_text
+
+    def do_action(self, *args):
+        self.view.go_to_level(self.code_text.value.strip().lower())
+
 class NextLevelAction(ButtonAction):
     def __init__(self, view):
         self.view = view
