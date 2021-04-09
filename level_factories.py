@@ -183,9 +183,9 @@ class MainLevelsFactory(BaseLevelFactory):
         yield from self.third_level()
 
     def third_level(self):
-        #yield InfoLevel("Let me prepare myself for next night", "./images/wake_up.jpg", None, "It was easy after preparation, let's prepare today too")
-        #yield from self.set_level_numbers(StudyPlaneLevelFactory().get_learning_rate_levels())
-        yield InfoLevel("You are back", "./images/dream.jpg", None, "There are new spells for you:</br><b>Lernos Ratos Minisimus<b> - set lernos ratos to minimum value and when you cast spell Iteratimus will not notice it</br><b>Lenos Ratos Previsimus<b></br>")
+        yield InfoLevel("Let me prepare myself for next night", "./images/wake_up.jpg", None, "It was easy after preparation, let's prepare today too")
+        yield from self.set_level_numbers(StudyPlaneLevelFactory().get_learning_rate_levels())
+        yield InfoLevel("You are back", "./images/dream.jpg", None, "There are new <b>Lernos Ratos</b> spells for you:</br><b>Minisimus</b> - set lernos ratos to minimum value, you can cast <b>Iteratimus</b> spells for free</br><b>Restorisimus</b> - restore lernos ratos to previous value</br><b>Incrisimus/Dicrisimus</b> - increase/decrease lernos ratos, note you can not use it till you call Restorisimus after Minisimus")
         yield from self.set_level_numbers(MonstersLevelsFactory().get_learning_rate_levels())
         yield InfoLevel("Congratulations", "./images/dream.jpg", None, "Congratulations! You once again show your potential, the way you handlered hide spell was impressive").set_hide_next_button(True)
 

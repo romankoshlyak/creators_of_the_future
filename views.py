@@ -52,7 +52,7 @@ class LevelView(object):
             children=self.index_grid_items(items),
             layout=Layout(
                 grid_template_rows='repeat(2, max-content)',
-                grid_template_columns='70% 30%',
+                grid_template_columns='65% 35%',
                 grid_template_areas='''
                 "item0 item1"
                 "item2 item3"
@@ -92,7 +92,7 @@ class LevelView(object):
         return []
 
     def get_magic_controls_items(self):
-        items = [Label('Spells:')] + self.get_all_spells()
+        items = self.get_all_spells()
         return items
 
     def get_magic_controls(self):
@@ -116,23 +116,25 @@ class LevelView(object):
         return items
 
     def get_weight_spells(self, model):
+        items = [Label('Iterasimus Spells:'), self.get_weight_spells_only(model)]
+        return VBox(children=items)
+
+    def get_weight_spells_only(self, model):
         items = self.get_weight_spells_items(model)
         return GridBox(
             children=items,
             layout=Layout(
                 grid_template_rows='repeat(4, max-content)',
-                grid_template_columns='50% 50%',
-                grid_template_areas='''
-                "item0 item1"
-                ''')
+                grid_template_columns='50% 50%')
        )
 
     def get_learning_rate_spells_items(self):
-        items = []
+        items = [Label('Lernos Ratos Spells:')]
         items.append(self.create_button('Lernos Ratos Minisimus', SaveAndSetLearningRateAction(self, self.MINIMUM_LEARNING_RATE)))
         items.append(self.create_button('Lernos Ratos Restorisimus', RestoreLearningRateAction(self)))
         items.append(self.create_button('Lernos Ratos Incrisimus', ChangeLearningRateAction(self, 2.0)))
         items.append(self.create_button('Lernos Ratos Decrisimus', ChangeLearningRateAction(self, 0.5)))
+        items = self.index_grid_items(items)
         return items
 
     def get_learning_rate_spells(self):
@@ -140,10 +142,11 @@ class LevelView(object):
         return GridBox(
             children=items,
             layout=Layout(
-                grid_template_rows='repeat(1, max-content)',
                 grid_template_columns='50% 50%',
                 grid_template_areas='''
-                "item0 item1"
+                "item0 item0"
+                "item1 item2"
+                "item3 item4"
                 ''')
        )
 
