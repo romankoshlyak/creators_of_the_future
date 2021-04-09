@@ -436,7 +436,9 @@ class ErrorSpace3dGraph(ErrorSpaceBaseGraph):
         ma = np.max(V)
         for level, color in zip(levels, colors):
             if mi < level and level < ma:
-                ax.contour(*self.indexer([M1, M2, V], ind), zdir=zdirs[ind[2]], offset=offsets[ind[2]], levels=[level], colors=[color])
+                with warnings.catch_warnings():
+                    warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning) 
+                    ax.contour(*self.indexer([M1, M2, V], ind), zdir=zdirs[ind[2]], offset=offsets[ind[2]], levels=[level], colors=[color])
 
         point_pr = list(point)
         point_pr[ind[2]] = offsets[ind[2]]
