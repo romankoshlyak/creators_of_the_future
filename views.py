@@ -215,6 +215,8 @@ class MonsterLevelView(LevelView):
         self.monster_max_size = 10.0
         self.main_graph = MonsterGraph(self)
         self.update_learning_rate_label()
+        # FIXME
+        self.update_status(0.0, 0.0)
 
     def is_show_error(self):
         return False
