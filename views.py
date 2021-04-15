@@ -699,6 +699,50 @@ class LearningRateLevelView(StudyPlaneView):
     def render(self):
         return self.get_main_view([self.get_level_status(), self.get_level_controls(), self.graph_box, self.get_controls()])
 
+class DevLevelView(LevelView):
+    def __init__(self, level, main_view):
+        super().__init__(level, main_view)
+        self.graph = DevGraph(self)
+
+    def update_model(self):
+        self.widgets_manager.disable_widgets()
+        self.current_graph.rerender()
+        self.widgets_manager.enable_widgets()
+
+    def get_dev_controls_items(self):
+        items = [Label('Dev controls:')]
+        items.append(Label("TODO"))
+        return items
+
+    def get_dev_controls(self):
+        items = self.get_dev_controls_items()
+        return GridBox(
+            children=items,
+            layout=Layout(
+                grid_template_areas='''
+                "item0"
+                "item1"
+                ''')
+       )
+
+    def get_controls(self):
+        return VBox(children=[self.get_dev_controls()])
+
+    def get_level_status(self):
+        items = self.index_grid_items([HTML('<h1>Prepare yourself for the next night</h1>'), HTML(f'Level {self.level.level_number}/{self.level.number_of_levels}'), Label("Extra info")])
+        return GridBox(
+            children=items,
+            layout=Layout(
+                grid_template_rows='repeat(2, max-content)',
+                grid_template_columns='20% 80%',
+                grid_template_areas='''
+                "item0 item0"
+                "item1 item2"
+                ''')
+       )
+
+    def render(self):
+        return self.get_main_view([self.get_level_status(), self.get_level_controls(), self.graph.get_graph(), self.get_controls()])
 
 class MainView(object):
     def __init__(self):
@@ -721,6 +765,8 @@ class MainView(object):
             return LearningRateLevelView(level, self)
         elif level.level_type == LevelType.LEARNING_RATE_MONSTERS:
             return LearningRateMonstersLevelView(level, self)
+        elif level.level_type == LevelType.DEV_LEVEL:
+            return DevLevelView(level, self)
 
     def go_to_level(self, level_code):
         for i, level in enumerate(self.levels):

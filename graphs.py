@@ -479,3 +479,13 @@ class ErrorSpace3dGraph(ErrorSpaceBaseGraph):
         self.draw_projection(*args, np.array([2, 1, 0]))
 
         plt.show()
+
+class DevGraph(BaseMainGraph):
+    def __init__(self, view):
+        super().__init__(view)
+
+    def render(self, a):
+        fig = plt.figure(figsize=(10, 10))
+        ax = fig.add_subplot()
+        ax.scatter(0, 0)
+        plt.show()

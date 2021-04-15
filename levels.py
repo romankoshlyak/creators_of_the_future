@@ -12,6 +12,7 @@ class LevelType(Enum):
     MULTI_SPLIT_MONSTERS = 5
     LEARNING_RATE = 6
     LEARNING_RATE_MONSTERS = 7
+    DEV_LEVEL = 100
 
 class ErrorType(Enum):
     SUM_LINEAR = 1
@@ -127,4 +128,9 @@ class LearningRateMonstersLevel(MultiSplitMonstersLevel):
     def __init__(self, *args):
         super().__init__(*args)
         self.set_level_type(LevelType.LEARNING_RATE_MONSTERS)
+
+class DevLevel(Level):
+    def __init__(self):
+        super().__init__(LevelType.DEV_LEVEL)
+        self.model = "not implemented"
 

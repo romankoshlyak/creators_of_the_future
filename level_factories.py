@@ -172,6 +172,10 @@ class MonstersLevelsFactory(BaseLevelFactory):
         ]
         yield SplitMonstersLevel(model, levels, colors, monsters, 3, 3).set_max_iterations(30)
 
+class DevLevelsFactory(BaseLevelFactory):
+    def get_dev_levels(self):
+        yield DevLevel()
+
 class MainLevelsFactory(BaseLevelFactory):
     def set_level_codes(self, salt, gen):
         levels = list(gen)
@@ -189,7 +193,16 @@ class MainLevelsFactory(BaseLevelFactory):
     def all_levels(self):
         #yield from self.first_level()
         #yield from self.second_level()
-        yield from self.set_level_codes("SALT_3", self.third_level())
+        yield from self.set_level_codes("SALT_3", self.all_levels_without_codes())
+
+    def all_levels_without_codes(self):
+        #yield from self.first_level()
+        #yield from self.second_level()
+        #yield from self.third_level()
+        yield from self.dev_levels()
+
+    def dev_levels(self):
+        yield from self.set_level_numbers(DevLevelsFactory().get_dev_levels())
 
     def third_level(self):
         yield InfoLevel("Let me prepare myself for next night", "./images/wake_up.jpg", None, "It was easy after preparation, let's prepare today too")
