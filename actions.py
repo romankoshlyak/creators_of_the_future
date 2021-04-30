@@ -36,6 +36,19 @@ class ChangeWeightAction(ButtonAction):
         Sounds.play_audio(self.audio_file)
         self.view.update_model()
 
+class ChangeWeightActionWithSelection(ButtonAction):
+    def __init__(self, direction, tensor, index, global_index, view):
+        self.direction = direction
+        self.tensor = tensor
+        self.index = index
+        self.global_index = global_index
+        self.view = view
+
+    def do_action(self, *args):
+        self.view.selected_index = self.global_index
+        self.tensor.view(-1)[self.index] += self.direction * self.view.learning_rate
+        self.view.update_model()
+
 class ChangeLearningRateAction(ButtonAction):
     def __init__(self, view, mult):
         self.view = view
@@ -69,9 +82,10 @@ class RestoreLearningRateAction(ButtonAction):
             self.view.update_learning_rate_label()
 
 class SelectGraphAction(ButtonAction):
-    def __init__(self, view, graph_box, selector, graphs):
+    def __init__(self, view, graph_box, graph_options_box, selector, graphs):
         self.view = view
         self.graph_box = graph_box
+        self.graph_options_box = graph_options_box
         self.selector = selector
         self.graphs = graphs
 
@@ -79,6 +93,7 @@ class SelectGraphAction(ButtonAction):
         self.view.current_graph = self.graphs[self.selector.index]
         self.view.current_graph.rerender()
         self.graph_box.children = [self.view.current_graph.get_graph()]
+        self.graph_options_box.children = self.view.current_graph.get_options()
 
 class ChooseDimensionAction(ButtonAction):
     def __init__(self, application, graph, dim_number, dim_selector):

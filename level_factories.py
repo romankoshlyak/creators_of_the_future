@@ -1,4 +1,5 @@
 import hashlib
+import random
 from utils import Images
 from models import LinearModel
 from levels import *
@@ -171,6 +172,31 @@ class MonstersLevelsFactory(BaseLevelFactory):
             MonsterInfo(2.0, -2.0, Images.SNOW_MONSTER, 1),
         ]
         yield SplitMonstersLevel(model, levels, colors, monsters, 3, 3).set_max_iterations(30)
+class HigherDimensionsLevelsFactory(BaseLevelFactory):
+    def get_points(self, target_model, vectors, step_size):
+        outputs = self.get_outputs(target_model, vectors)
+        self.check_outputs(outputs, step_size)
+        return [Point(vector, output) for vector, output in zip(vectors, outputs)]
+
+    def gen_model_weights(self, dim):
+        possible_weights = list(map(lambda x: x/10.0, range(-5, 6)))
+        return random.choices(possible_weights, k=dim)
+    def gen_points(self, n, dim):
+        possible_coord = list(map(lambda x: x/10.0, range(-20,21)))
+        return [random.choices(possible_coord, k=dim) for i in range(n)]
+
+    def get_higher_dimensions_levels(self):
+        random.seed(42)
+        weights = self.gen_model_weights(1)
+        for dim in range(2, 10):
+            model = LinearModel(weights+[-1.0], True)
+            weights = self.gen_model_weights(dim)
+            target_model = LinearModel(weights, True)
+            points = self.gen_points(7, dim-1)
+            step_size = 0.01
+            points = self.get_points(target_model, points, step_size)
+            learning_rate = 0.1
+            yield HigherDimensionsLevel(learning_rate, model, points, step_size, ErrorType.SUM_LINEAR, 1.0)
 
 class DevLevelsFactory(BaseLevelFactory):
     def get_dev_levels(self):
@@ -199,10 +225,17 @@ class MainLevelsFactory(BaseLevelFactory):
         #yield from self.first_level()
         #yield from self.second_level()
         #yield from self.third_level()
-        yield from self.dev_levels()
+        yield from self.fourth_levels()
+
+        #yield from self.dev_levels()
 
     def dev_levels(self):
         yield from self.set_level_numbers(DevLevelsFactory().get_dev_levels())
+
+    def fourth_levels(self):
+        yield InfoLevel("Follow me to 9 dimension", "./images/dream.jpg", None, "9 dimension is special for Creators of The Future")
+        yield from self.set_level_numbers(HigherDimensionsLevelsFactory().get_higher_dimensions_levels())
+        yield InfoLevel("Congratulations", "./images/dream.jpg", None, "Congratulations! Now you can work in 9 dimension, this dimension will help you to kill <b>Xorisimus</b> one day").set_hide_next_button(True)
 
     def third_level(self):
         yield InfoLevel("Let me prepare myself for next night", "./images/wake_up.jpg", None, "It was easy after preparation, let's prepare today too")
@@ -210,7 +243,6 @@ class MainLevelsFactory(BaseLevelFactory):
         yield InfoLevel("You are back", "./images/dream.jpg", None, "There are new <b>Lernos Ratos</b> spells for you:</br><b>Minisimus</b> - set lernos ratos to minimum value, you can cast <b>Iteratimus</b> spells for free</br><b>Restorisimus</b> - restore lernos ratos to previous value</br><b>Incrisimus/Dicrisimus</b> - increase/decrease lernos ratos, note you can not use it till you call Restorisimus after Minisimus")
         yield from self.set_level_numbers(MonstersLevelsFactory().get_learning_rate_levels())
         yield InfoLevel("Congratulations", "./images/dream.jpg", None, "Congratulations! You once again show your potential, the way you handlered hide spell was impressive").set_hide_next_button(True)
-
 
     def second_level(self):
         yield InfoLevel("Let me prepare myself for next night", "./images/wake_up.jpg", None, "It was easy after preparation, let's prepare today too")

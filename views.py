@@ -21,7 +21,7 @@ class LevelView(object):
         self.is_learning_rate_saved = False
 
     def get_model_data(self):
-        data = torch.tensor([[point.x, point.y] for point in self.level.points], dtype=torch.float)
+        data = torch.tensor([point.vector for point in self.level.points], dtype=torch.float)
         return data
 
     def get_model_target(self):
@@ -457,7 +457,7 @@ class StudyPlaneView(LevelView):
         self.set_up_learning_rate(level)
         self.error = HTML('Error')
         self.error_value = 1.0
-        self.main_graph = StudyPlaneGraph(self)
+        #self.main_graph = StudyPlaneGraph(self)
 
     def set_error(self, errors, colors):
         if self.level.error_type == ErrorType.SUM_LINEAR:
@@ -571,24 +571,30 @@ class LearningRateLevelView(StudyPlaneView):
         self.learning_rate = level.learning_rate
         self.learning_rate_label = Label("Learning rate")
         self.graph_box = VBox(children=[])
-        self.graph_selector = self.setup_graph_selector()
+        self.graph_selector = self.setup_graph_selector(self.get_graphs())
 
         self.update_error()
         self.update_learning_rate_label()
 
-    def setup_graph_selector(self):
+    def get_graphs(self):
         is_error_space_3d = len(self.model.get_weights()) == 3
         error_space_graph = None
         if is_error_space_3d:
             error_space_graph = ErrorSpace3dGraph(self)
         else:
-            error_space_graph = ErrorSpace2dGraph(self)
-        graph_selector = widgets.Dropdown(options=self.GRAPHS, description='View:')
+            error_space_graph = ErrorSpace2dGraph(self)   
+        problem_space_graph = StudyPlaneGraph(self)
 
-        action = SelectGraphAction(self, self.graph_box, graph_selector, [error_space_graph, StudyPlaneGraph(self)])
+        return (self.GRAPHS, [error_space_graph, problem_space_graph])   
+
+    def setup_graph_selector(self, graphs):
+        graph_options_box = VBox(children=[Label("Hi")])
+        graph_selector = widgets.Dropdown(options=graphs[0], description='View:')
+
+        action = SelectGraphAction(self, self.graph_box, graph_options_box, graph_selector, graphs[1])
         action.do_action()
         graph_selector.observe(action.do_action, names='value')
-        return graph_selector
+        return VBox(children=[graph_selector, graph_options_box])
 
     def update_learning_rate_label(self):
         self.learning_rate_label.value = f"{self.learning_rate:.5f}"
@@ -624,23 +630,37 @@ class LearningRateLevelView(StudyPlaneView):
         self.update_error()
         self.next_level_button.disabled = bool(self.error_value > self.level.error_limit+1e-5)
 
+    def get_param_name(self, param_name, index):
+        if param_name == 'linear.weight':
+            return f'Weight {index}'
+        elif param_name == 'linear.bias':
+            return f'Bias'
+        else:
+            raise BaseException(f'Unexpected param_name = {param_name}')
+
+    def get_change_weight_action(self, direction, tensor, index, global_index, view):
+        return ChangeWeightAction(direction, tensor, i, self)
+
     def get_weight_controls_items(self):
         model = self.level.model
-        param_index = 0
         items = [Label('Parameters:')]
         buttons = []
-        for param in model.parameters():
-            tensor = param.data
-            for i in range(len(tensor.view(-1))):
-                param_name = self.PARAM_NAMES[param_index]
-                param_index += 1
-                items.append(Label(param_name))
-                button = self.create_button('Add', ChangeWeightAction(1.0, tensor, i, self))
+        global_index = 0
+        global_index = sum([param.view(-1).size(0) for param in model.parameters()])
+        for param_name, param in model.named_parameters():
+            tensor = param.data.view(-1)
+            tensor_lengh = len(tensor)
+            for i in reversed(range(tensor_lengh)):
+                global_index -= 1
+                param_name_label = self.get_param_name(param_name, i)
+                items.append(Label(param_name_label))
+                button = self.create_button('Add', self.get_change_weight_action(1.0, tensor, i, global_index, self))
                 buttons.append(button)
                 items.append(button)
-                button = self.create_button('Sub', ChangeWeightAction(-1.0, tensor, i, self))
+                button = self.create_button('Sub', self.get_change_weight_action(-1.0, tensor, i, global_index, self))
                 buttons.append(button)
                 items.append(button)
+
                 
         self.buttons = buttons
         items = self.index_grid_items(items)
@@ -648,18 +668,13 @@ class LearningRateLevelView(StudyPlaneView):
 
     def get_weight_controls(self):
         items = self.get_weight_controls_items()
-        return GridBox(
-            children=items,
-            layout=Layout(
-                grid_template_rows='repeat(4, max-content)',
-                grid_template_columns='max-content auto auto',
-                grid_template_areas='''
-                "item0 item0 item0"
-                "item1 item2 item3"
-                "item4 item5 item6"
-                "item7 item8 item9"
-                ''')
-       )
+        grid = widgets.GridspecLayout((len(items)+2)//3, 3)
+        grid[0,:] = items[0]
+        for i, item in enumerate(items):
+            if i == 0:
+                grid[i,:] = items[i]
+            grid[(i+2)//3,(i-1)%3] = items[i]
+        return grid
 
     def get_options_controls_items(self):
         items = [Label('Options:')]
@@ -669,16 +684,7 @@ class LearningRateLevelView(StudyPlaneView):
 
     def get_options_controls(self):
         items = self.get_options_controls_items()
-        return GridBox(
-            children=items,
-            layout=Layout(
-                grid_template_rows='repeat(4, max-content)',
-                grid_template_columns='max-content auto auto',
-                grid_template_areas='''
-                "item0"
-                "item1"
-                ''')
-       )
+        return VBox(children=items)
 
     def get_controls(self):
         return VBox(children=[self.get_options_controls(), self.get_learning_rate_controls(), self.get_weight_controls()])
@@ -698,6 +704,18 @@ class LearningRateLevelView(StudyPlaneView):
 
     def render(self):
         return self.get_main_view([self.get_level_status(), self.get_level_controls(), self.graph_box, self.get_controls()])
+
+class HigherDimensionsLevelView(LearningRateLevelView):
+    def __init__(self, level, main_view):
+        self.selected_index = len(level.model.get_weights())-1
+        super().__init__(level, main_view)
+
+    def get_graphs(self):
+        graph = HigherDimensionsGraph(self)
+        return (["Error space"], [graph])
+
+    def get_change_weight_action(self, direction, tensor, index, global_index, view):
+        return ChangeWeightActionWithSelection(direction, tensor, index, global_index, self)
 
 class DevLevelView(LevelView):
     def __init__(self, level, main_view):
@@ -765,6 +783,8 @@ class MainView(object):
             return LearningRateLevelView(level, self)
         elif level.level_type == LevelType.LEARNING_RATE_MONSTERS:
             return LearningRateMonstersLevelView(level, self)
+        elif level.level_type == LevelType.HIGHER_DIMENSIONS:
+            return HigherDimensionsLevelView(level, self)
         elif level.level_type == LevelType.DEV_LEVEL:
             return DevLevelView(level, self)
 

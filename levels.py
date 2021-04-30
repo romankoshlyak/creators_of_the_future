@@ -12,6 +12,7 @@ class LevelType(Enum):
     MULTI_SPLIT_MONSTERS = 5
     LEARNING_RATE = 6
     LEARNING_RATE_MONSTERS = 7
+    HIGHER_DIMENSIONS = 8
     DEV_LEVEL = 100
 
 class ErrorType(Enum):
@@ -24,6 +25,11 @@ class PointInfo(object):
     def __init__(self, x, y, target):
         self.x = x
         self.y = y
+        self.target = target
+
+class Point(object):
+    def __init__(self, vector, target):
+        self.vector = vector
         self.target = target
 
 class MonsterInfo(PointInfo):
@@ -128,6 +134,16 @@ class LearningRateMonstersLevel(MultiSplitMonstersLevel):
     def __init__(self, *args):
         super().__init__(*args)
         self.set_level_type(LevelType.LEARNING_RATE_MONSTERS)
+class LearningRateLevel(StudyPlaneLevel):
+    def __init__(self, learning_rate, model, points, step_size, error_type, error_limit):
+        super().__init__(model, points, step_size, error_type, error_limit)
+        self.learning_rate = learning_rate
+        self.set_level_type(LevelType.LEARNING_RATE)
+
+class HigherDimensionsLevel(LearningRateLevel):
+    def __init__(self, *args):
+        super().__init__(*args)
+        self.set_level_type(LevelType.HIGHER_DIMENSIONS)
 
 class DevLevel(Level):
     def __init__(self):

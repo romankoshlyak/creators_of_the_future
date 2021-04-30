@@ -1,12 +1,15 @@
 import warnings
+import sys
 import math
 import copy
 import torch
 import numpy as np
 import ipywidgets as widgets
 import torch.nn as nn
+from torch.nn.utils import parameters_to_vector
 from matplotlib import colors
 import matplotlib.pyplot as plt
+import matplotlib.transforms as transforms
 
 class BaseGraph(object):
     def __init__(self):
@@ -15,10 +18,17 @@ class BaseGraph(object):
 
     def get_graph(self):
         if self.__graph is None:
-            self.__graph = widgets.interactive_output(self.render, {'a' : self.graph_update})
+            self.__graph = widgets.interactive_output(self.render_with_catch, {'a' : self.graph_update})
         return self.__graph
 
-    def rerender(self):
+    def render_with_catch(self, a):
+        try:
+            self.render(a)
+        except:
+            print("Unexpected error:", sys.exc_info()[0])
+            raise
+
+    def rerender(self, *args):
         self.graph_update.value = self.graph_update.value + 1
 
 class BaseMainGraph(BaseGraph):
@@ -98,7 +108,7 @@ class BaseMainGraph(BaseGraph):
         return target
 
     def get_model_data_all(self):
-        data = torch.tensor([[point.x, point.y] for point in self.view.level.points], dtype=torch.float)
+        data = torch.tensor([point.vector for point in self.view.level.points], dtype=torch.float)
         return data
 
     def get_model_data(self):
@@ -351,20 +361,22 @@ class ErrorSpaceBaseGraph(BaseMainGraph):
         loss = nn.L1Loss(reduction='sum')
         return (model, data, target, loss)
 
-    def func_array(self, model_data, X, Y, z, ind=np.array([0,1,2])):
+    def func_array(self, model_data, X, Y, point, index1, index2):
+        point = copy.deepcopy(point)
         res_shape = X.shape
         X = X.reshape(-1)
         Y = Y.reshape(-1)
         V = np.empty_like(X)
         n = len(X)
         for i in range(n):
-            args = np.array([X[i], Y[i], z])
-            V[i] = self.func_fast(model_data, *args[ind])
+            point[index1] = X[i]
+            point[index2] = Y[i]
+            V[i] = self.func_fast(model_data, point)
         return V.reshape(res_shape)
 
-    def func_fast(self, model_data, x, y, z):
+    def func_fast(self, model_data, point):
         model, data, target, loss = model_data
-        model.set_weights(x, y, z)
+        model.set_weights(point)
         with torch.no_grad():
             output = model(data).view_as(target)
             return loss(output, target).item()
@@ -479,6 +491,269 @@ class ErrorSpace3dGraph(ErrorSpaceBaseGraph):
         self.draw_projection(*args, np.array([2, 1, 0]))
 
         plt.show()
+
+class Point2D(object):
+    def __init__(self, x, y):
+        self.x = x
+        self.y = y
+
+    @classmethod
+    def zero(cls):
+        return cls(0.0, 0.0)
+
+    @classmethod
+    def from_vector(cls, vector):
+        return cls(vector[0], vector[1])
+
+    def mult(self, mult):
+        return Point2D(self.x*mult, self.y*mult)
+
+    def add(self, point):
+        return Point2D(self.x+point.x, self.y+point.y)
+
+    def neg(self):
+        return Point2D(-self.x, -self.y)
+
+    def right(self):
+        return Point2D(self.y, self.x)
+
+    def left(self):
+        return Point2D(self.y, -self.x)
+
+    def __iter__(self):
+       return iter(self.to_list())
+
+    def to_list(self):
+        return [self.x, self.y]
+
+
+class HigherDimensionsGraph(ErrorSpaceBaseGraph):
+    def __init__(self, view):
+        self.__setup_options()
+        super().__init__(view)
+
+    def plot_line(self, ax, p1, p2, color='black', linestyle = 'solid'):
+        ax.plot((p1.x, p2.x), (p1.y, p2.y), color=color, linestyle=linestyle)
+
+    def draw_projected_value(self, ax, axis, grid, transform,  point, model_data, index1, index2):
+        offset = self.calc_offset(axis, index1, index2)
+        ax1 = axis[index1]
+        ax2 = axis[index2]
+        transform = transform+transforms.Affine2D.from_values(ax1.x, ax1.y, ax2.x, ax2.y, 0.0, 0.0)+transforms.Affine2D().translate(offset.x, offset.y)+ax.transData
+        M1, M2 = np.meshgrid(self.np_points(grid), self.np_points(grid))
+        V = self.func_array(model_data, M1, M2, point, index1, index2)
+        mi = np.min(V)
+        ma = np.max(V)
+        for level, color in zip(self.levels, self.colors):
+            if mi < level and level < ma:
+                with warnings.catch_warnings():
+                    warnings.filterwarnings('ignore', category=np.VisibleDeprecationWarning) 
+                    ax.contour(M1, M2, V, levels=[level], colors=[color], transform=transform)
+
+    def draw_projected_values(self, ax, axis, grid, transform, point):
+        model_data = self.get_model_data()
+        for index2 in range(len(axis)):
+            for index1 in range(index2):
+                self.draw_projected_value(ax, axis, grid, transform, point, model_data, index1, index2)
+
+    def draw_axi_name(self, ax, axi, axi_name, grid, offset, direction=1):
+        next_offset = offset.add(axi)
+        offset_behind = axi.left().mult(direction*0.01)
+        xylabel = offset.add(next_offset).mult(0.5).add(offset_behind)
+        xylabel_left = offset.add(offset_behind)
+        xylabel_right = next_offset.add(offset_behind)
+        p1 = Point2D.from_vector(ax.transData.transform_point(list(offset)))
+        p2 = Point2D.from_vector(ax.transData.transform_point(list(next_offset)))
+        diff = p2.add(p1.neg())
+        rotn = np.degrees(np.arctan2(*diff.right()))
+        va_value = 'top' if direction == 1 else 'bottom'
+        ax.annotate(axi_name, xy=xylabel, ha='center', va=va_value, rotation=rotn, rotation_mode='anchor')
+        ax.annotate(f'{grid[0]:.2f}', xy=xylabel_left, ha='left', va=va_value, rotation=rotn, rotation_mode='anchor')
+        ax.annotate(f'{grid[1]:.2f}', xy=xylabel_right, ha='right', va=va_value, rotation=rotn, rotation_mode='anchor')
+        offset = next_offset
+        return offset
+
+    def draw_axis_names(self, ax, axis, axis_names, grid=(-1.0, 1.0)):
+        axis_zip = list(zip(axis, axis_names))
+        args = [(axis_zip, 1), (reversed(axis_zip), -1)]
+        for arg_axis_zip, arg_direction in args:
+            offset = Point2D.zero()
+            for axi, axi_name in arg_axis_zip:
+                offset = self.draw_axi_name(ax, axi, axi_name, grid, offset, direction=arg_direction)
+
+    def draw_space(self, ax, axis, main_offset=Point2D(0.0, 0.0), color='black', linestyle='solid'):
+        if len(axis) == 1:
+            main_point = max(main_offset.to_list())
+            self.plot_line(ax, main_offset, main_offset.add(axis[0]), color, linestyle)
+
+        for index2 in range(len(axis)):
+            for index1 in range(index2):
+                offset = main_offset.add(self.calc_offset(axis, index1, index2))
+                a1 = axis[index1]
+                a2 = axis[index2]
+                a_sum = a1.add(a2)
+                a1 = offset.add(a1)
+                a2 = offset.add(a2)
+                a_sum = offset.add(a_sum)
+                if index1 == 0:
+                    self.plot_line(ax, offset, a1, color, linestyle)
+                    self.plot_line(ax, a1, a_sum, color, linestyle)
+                self.plot_line(ax, offset, a2, color, linestyle)
+                self.plot_line(ax, a2, a_sum, color, linestyle)
+
+    def calc_offset(self, axis, index1, index2):
+        offset = Point2D(0.0, 0.0)
+        for index in range(index1+1, index2):
+            offset = offset.add(axis[index])
+        return offset
+
+    def calc_point2d(self, axis, point):
+        result = Point2D(0.0, 0.0)
+
+        for axi, p in zip(axis, point):
+            result = result.add(axi.mult(p))
+        return result
+
+    def get_projection(self, axis, index1, index2, point):
+        offset = self.calc_offset(axis, index1, index2)
+        indexes = [index1, index2]
+        projection_point = self.calc_point2d([axis[i] for i in indexes], [point[i] for i in indexes])
+        projection_point = projection_point.add(offset)
+        return projection_point
+
+    def reindex(self, index, selected_index):
+        if index >= selected_index:
+            index -= 1
+        return index
+
+    def draw_point(self, ax, axis, selected_index, point, color):
+        main_point = self.calc_point2d(axis, point)
+        if self.show_subspace.value:
+            subspace_axis = self.remove(axis, selected_index)
+            subspace_point = self.remove(point, selected_index)
+            subspace_offset = self.get_axis_offset(axis, point, selected_index)
+
+        for index2 in range(len(axis)):
+            for index1 in range(index2):
+                offset = self.calc_offset(axis, index1, index2)
+                projection_point = self.get_projection(axis, index1, index2, point)
+                subspace_projection_point = None
+                if self.show_subspace.value and index1 != selected_index and index2 != selected_index:
+                    subspace_index1 = self.reindex(index1, selected_index)
+                    subspace_index2 = self.reindex(index2, selected_index)
+                    subspace_projection_point = subspace_offset.add(self.get_projection(subspace_axis, subspace_index1, subspace_index2, subspace_point))
+
+                from_point = main_point
+                if self.show_projection_line.value:
+                    if subspace_projection_point is not None:
+                        self.plot_line(ax, from_point, subspace_projection_point, linestyle=(0, (2, 4)), color='#8888ff')
+                        ax.scatter(*subspace_projection_point, color='#8888ff')
+                        from_point = subspace_projection_point
+                    self.plot_line(ax, from_point, projection_point, linestyle=(0, (2, 4)), color='grey')
+                ax.scatter(*projection_point, color='grey')
+
+        ax.scatter(*main_point, color=color)
+
+    def get_axis_names(self, model):
+        axis_names = []
+        for param_name, param in reversed(list(model.named_parameters())):
+            tensor = param.data.view(-1)
+            tensor_lengh = len(tensor)
+            for i in range(tensor_lengh):
+                axis_name_label = self.view.get_param_name(param_name, i)
+                axis_names.append(axis_name_label)
+        return axis_names
+
+    def get_axis(self, n, next_axis_percentage):
+        axis = []
+        for i in range(n):
+            angle = -math.pi/2.0+math.pi*((1.0+i)/(n)*(1.0-next_axis_percentage)+(1.0+i)/(n+1)*next_axis_percentage)
+            axis.append(Point2D(math.cos(angle), math.sin(angle)))
+        return axis
+
+    def remove(self, l, i):
+        ll = list(l)
+        ll.pop(i)
+        return ll
+
+    def get_axis_offset(self, axis, point, index):
+        return axis[index].mult(point[index])
+
+    def calc_box(self, axis):
+        min_x, max_x, min_y, max_y = 0.0, 0.0, 0.0, 0.0
+        current_point = Point2D(0.0, 0.0)
+
+        for direction in [1, -1]:
+            for axi in axis:
+                current_point = current_point.add(axi.mult(direction))
+                min_x = min(min_x, current_point.x)
+                max_x = max(max_x, current_point.x)
+                min_y = min(min_y, current_point.y)
+                max_y = max(max_y, current_point.y)
+        max_d = max(max_x-min_x, max_y-min_y)
+        text_width = max_d*0.01
+        min_x -= text_width
+        max_x += text_width
+        min_y -= text_width
+        max_y += text_width
+        max_d = max(max_x-min_x, max_y-min_y)
+        max_x = min_x+max_d
+        max_y = min_y+max_d
+        return min_x, max_x, min_y, max_y
+
+    def setup_limits(self, ax, axis):
+        min_x, max_x, min_y, max_y = self.calc_box(axis)
+        ax.set_xlim(min_x, max_x)
+        ax.set_ylim(min_y, max_y)
+        plt.axis('off')
+
+    def get_tranform(self, n):
+        n = (n*(n-1))/2
+        grid_min = -1.0
+        grid_max = 1.0
+        grid = (grid_min, grid_max, (grid_max-grid_min)/int(50.0/math.sqrt(n)))
+        translate = -grid[0]
+        scale = 1.0/(grid[1]-grid[0])
+        translate_and_scale = transforms.Affine2D().translate(translate, translate).scale(scale, scale)
+        transform1d = lambda x: (x+translate)*scale
+        return grid, translate_and_scale, transform1d
+
+    def render(self, a):
+        parameters = parameters_to_vector(reversed(list(self.view.level.model.parameters())))
+        axis = self.get_axis(len(parameters), self.next_axis_percentage.value)
+        axis_names = self.get_axis_names(self.view.level.model)
+        grid, transform, transform1d = self.get_tranform(len(parameters))
+        point = parameters.tolist()
+        normalized_point = list(map(transform1d, point))
+        fig = plt.figure(figsize=(12, 12))
+        ax = fig.add_subplot()
+        self.setup_limits(ax, axis)
+
+        selected_index = self.view.selected_index
+        self.draw_space(ax, axis)
+        if self.show_projected_value.value:
+            self.draw_projected_values(ax, axis, grid, transform, point)
+        self.draw_axis_names(ax, axis, axis_names)
+        self.draw_point(ax, axis, selected_index, normalized_point, 'blue')
+        if self.show_subspace.value:
+            subspace_axis = self.remove(axis, selected_index)
+            subspace_offset = self.get_axis_offset(axis, normalized_point, selected_index)
+            self.draw_space(ax, subspace_axis, main_offset=subspace_offset, color='blue', linestyle=(0, (5, 10)))
+        plt.show()
+
+    def __setup_options(self):
+        self.show_subspace = widgets.Checkbox(value=True, description='Show subspace')
+        self.show_projection_line = widgets.Checkbox(value=True, description='Show projection line')
+        self.show_projected_value = widgets.Checkbox(value=True, description='Show projected error')
+        self.next_axis_percentage = widgets.FloatSlider(value=0.0, min=0, max=1.0, step=0.001,
+            description='Next axis:', continuous_update=True, readout=True, readout_format='.3f')
+        self.options = [self.show_subspace, self.show_projection_line, self.show_projected_value, self.next_axis_percentage]
+        for option in self.options:
+            option.observe(self.rerender, 'value')
+
+    def get_options(self):
+        return self.options
+
 
 class DevGraph(BaseMainGraph):
     def __init__(self, view):
